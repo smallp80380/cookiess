@@ -1,0 +1,29 @@
+{
+  "browser": "154.0.8037.0",
+  "extensionId": "kfkonfldghfljheniinnmapfebhdfaeh",
+  "tests": [
+    "manifest resources load; unsupported controller state; native popup has no-access state",
+    "native permission denial is distinct from empty cookies",
+    "native permission approval immediately loads list and survives popup reopen",
+    "onChanged reloads all paths, correct parent/hostOnly scope and current partition only",
+    "search, dark theme, keyboard focus and fixed popup dimensions",
+    "editor displays attributes; save preserves session/HttpOnly/unspecified and re-reads API",
+    "Add validates fields, creates persistent None Secure and Cancel protects dirty draft",
+    "ambiguous duplicate deletion refuses mutation; selected deletion excludes unselected cookies",
+    "identity rename creates new row and removes old row",
+    "hostOnly/domain same domain path name coexist; JSON import keeps both identities",
+    "partitioned editor saves full key and leaves other partitions untouched",
+    "JSON export all ignores search; native file download and clipboard/manual fallback",
+    "import preview, foreign-domain rejection, malformed record and actual partial results",
+    "Netscape paste and JSON local file import",
+    "hundreds of rows, long Unicode names and XSS values remain within popup",
+    "stale active-tab navigation blocks mutation until explicit refresh",
+    "Remove all requires host/count confirmation and affects only current host",
+    "localhost and IP optional access loads true HTTP site cookies",
+    "permission revocation disables writes and refresh returns no-access state",
+    "incognito popup uses a separate store; CRUD never changes normal store"
+  ],
+  "unhandledErrors": [],
+  "profile": "temporary isolated synthetic profile",
+  "popup": "native action target via Extensions.triggerAction"
+}

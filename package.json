@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "test:browser": "node scripts/browser-test.mjs",
-    "package": "npm run build && node scripts/package.mjs"
+    "package": "npm run build && node scripts/package.mjs",
+    "store:assets": "node scripts/store-assets.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -22,5 +23,6 @@
     "typescript-eslint": "^8.44.1",
     "vite": "^7.1.7",
     "vitest": "^4.1.11"
-  }
+  },
+  "license": "MIT"
 }

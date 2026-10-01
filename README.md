@@ -71,3 +71,15 @@ Browser acceptance: Linux, Xvfb, xdotool, ImageMagick и Chromium 154+ с CDP Ex
 `cookies` — доступ к cookie API. `activeTab` — URL сайта при нажатии иконки без чтения истории всех вкладок. `storage` — только выбранная тема. Optional host permissions `*://*/*` объявляют возможность запрашивать HTTP/HTTPS-сайты; runtime запрос ограничен выбранным сайтом. Полный доступ ко всем сайтам автоматически не запрашивается. `tabs`, `history`, `webRequest`, `debugger`, `downloads` и clipboard permissions отсутствуют. Скачивание через Blob/anchor; clipboard — только по явному действию.
 
 Cookie values остаются в памяти popup и явно экспортируемых локальных файлах/clipboard. Не сохраняются в storage, не логируются и не отправляются в сеть. Скриншоты содержат исключительно синтетические данные. Incognito работает только если пользователь отдельно разрешил расширение в настройках Chrome; stores не смешиваются. См. ограничения реальной проверки в `VERIFICATION.md`.
+
+## CI и подготовка к магазину
+
+[GitHub Actions CI](https://github.com/smallp80380/cookiess/actions/workflows/ci.yml) проверяет typecheck, lint, unit-тесты, сборку и содержимое ZIP на Linux, Windows и macOS. Установочный ZIP сохраняется как артефакт Linux job. Это проверка сборки, а проверка настоящего popup остаётся отдельной.
+
+[Политика конфиденциальности](https://smallp80380.github.io/cookiess/) · [Исходный текст](PRIVACY.md) · [Материалы карточки](store/LISTING.md) · [Инструкция и ручные проверки](store/REVIEW.md).
+
+Изображения карточки: `store/assets/`. Команда `npm run store:assets` воспроизводит их из настоящих синтетических popup-скриншотов; требуется Playwright Chromium либо `CHROMIUM_PATH`. Подготовка комплекта не означает публикацию в Chrome Web Store.
+
+## Лицензия
+
+Собственный код — [MIT](LICENSE). Лицензии встроенных зависимостей сохранены в [THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt).

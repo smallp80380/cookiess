@@ -18,8 +18,21 @@ No backend, analytics, ads, remote code, content scripts or AI service. No histo
 
 ## Data handling declaration
 
-Cookies may contain authentication data and personal information. The extension reads them locally to provide its single purpose. It does not collect, transmit, sell or use them for advertising. No cookie values are retained in extension storage or logs. Imported files are read locally; exported files/clipboard are controlled by the user. Theme is retained locally. No policy URL has been invented; if publishing later, host a policy matching these actual statements.
+Cookies may contain authentication data and personal information. The extension reads them locally to provide its single purpose. It does not collect, transmit, sell or use them for advertising. No cookie values are retained in extension storage or logs. Imported files are read locally; exported files/clipboard are controlled by the user. Theme is retained locally. Policy source: [PRIVACY.md](PRIVACY.md). Public policy page: https://smallp80380.github.io/cookiess/ (deployment is verified separately before entering the URL in the dashboard).
 
-## Submission materials still needed for publication
+## Prepared submission bundle
 
-Publisher account/authorization, hosted privacy policy URL, final store-sized screenshots and promotional assets, chosen category and localization, and manual release review in stable Chrome including incognito/minimum version. Current screenshots are synthetic test-popup evidence, not a claim of completed Store review. No publication or account operation was performed.
+- Russian listing text and proposed category: [store/LISTING.md](store/LISTING.md).
+- Four screenshots at 1280×800 and one promotional tile at 440×280: [store/assets](store/assets/). They compose unchanged real native-popup captures with explanatory copy; they are listing materials, not additional browser verification.
+- Extension icon: `public/icons/128.png`; already present in the install ZIP.
+- Bilingual privacy policy: [PRIVACY.md](PRIVACY.md), public HTML in `docs/index.html`.
+- Review instructions and final manual checks: [store/REVIEW.md](store/REVIEW.md).
+- Rebuild listing assets with `npm run store:assets` after installing Playwright Chromium (`npx playwright install chromium`), or set `CHROMIUM_PATH` to an installed browser. Asset generation uses no network resources.
+
+Image dimensions and submission fields checked against [Chrome image guidance](https://developer.chrome.com/docs/webstore/images) and [privacy dashboard guidance](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy) on 2026-10-01.
+
+## Remaining before submission
+
+- Execute the pending stable Windows/macOS Chrome and minimum-version/manual clipboard/TXT checks in `store/REVIEW.md`. CI builds on these platforms do not verify native popup behavior there.
+- Confirm publisher identity/account, exact dashboard category, policy URL and accurate privacy declarations.
+- Obtain explicit authorization for Chrome Web Store submission and any account/payment operation. GitHub publication is authorized; Store submission has not occurred.

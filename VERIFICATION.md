@@ -68,3 +68,13 @@ Only synthetic data; all main images are actual native popup captures:
 - Closing the browser popup loses unsaved drafts. Internal navigation confirms dirty edits; the extension cannot keep Chrome's popup open after external dismissal.
 
 Manual before a future Store release: load ZIP unpacked with Developer mode in stable Chrome; check consent, direct clipboard copying, JSON/TXT download, editor/keyboard, and Incognito (after explicitly enabling extension access) on synthetic sites. Confirm expected scope after navigating an active tab. Compare normal/private stores. Never use real account cookies in screenshots. Publication requires separate authorization; current CHROMEWEBSTORE.md is preparation only.
+
+## Release readiness follow-up — 2026-10-01
+
+- Added CI on Ubuntu, Windows and macOS for typecheck, lint, 20 unit tests, packaged build and exact ZIP/manifest resource validation. CI platform builds are separate from browser acceptance.
+- Repeated native action-popup suite in isolated Linux Chrome for Testing 154.0.8037.92: all 20 checks passed, including native permission dialog, partial failure, current-partition scope and native incognito store. Latest screenshots/browser-results.json records this second run.
+- Local typecheck, lint, 20 unit tests, build/package and scripts/verify-package.py passed.
+- Store listing compositions were rendered from unchanged real synthetic native-popup captures. PNG dimensions are 1280×800 (four screenshots) and 440×280 (promo); these compositions do not count as extension behavior tests.
+- Privacy page desktop/mobile layouts and support links checked in headless Chromium.
+- MIT license added by explicit user choice; bilingual privacy policy, static public policy page and reviewer checklist prepared.
+- Stable Windows/macOS browser behavior, Chrome 132, direct clipboard success, native TXT download, screen-reader and exhaustive concurrency checks remain pending as recorded above and in store/REVIEW.md. No Store submission, publisher account setup or paid service was performed.

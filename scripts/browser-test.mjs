@@ -207,7 +207,7 @@ try {
     'native permission approval immediately loads list and survives popup reopen',
     async () => {
       await permissionClick();
-      nativeClick(683, 266);
+      assert.equal(spawnSync('xdotool', ['key', 'Tab', 'Return']).status, 0);
       await delay(300);
       await idle();
       assert.match(await evaluate('document.body.innerText'), /0 из 0 cookies/);
@@ -682,7 +682,7 @@ try {
       await openPopup();
       assert.match(await evaluate('document.body.innerText'), /Доступ к сайту/);
       await permissionClick();
-      nativeClick(683, 266);
+      assert.equal(spawnSync('xdotool', ['key', 'Tab', 'Return']).status, 0);
       await delay(250);
       await idle();
       await clickText('Add');

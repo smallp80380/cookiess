@@ -37,6 +37,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         with:
           name: cookiess-install-zip
-          path: artifacts/cookiess-1.0.0.zip
+          path: artifacts/cookiess-*.zip
           if-no-files-found: error
           retention-days: 14

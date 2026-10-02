@@ -211,14 +211,14 @@ async function reload() {
 function backHeader(title: string) {
   const bar = el('div', 'panel-title');
   const back = button(
-    '',
+    'Назад',
     () => {
       if (leave()) {
         screen = 'list';
         renderList();
       }
     },
-    'icon-button',
+    'back-button',
     'back',
   );
   back.setAttribute('aria-label', 'Назад к списку');

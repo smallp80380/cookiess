@@ -78,3 +78,11 @@ Manual before a future Store release: load ZIP unpacked with Developer mode in s
 - Privacy page desktop/mobile layouts and support links checked in headless Chromium.
 - MIT license added by explicit user choice; bilingual privacy policy, static public policy page and reviewer checklist prepared.
 - Stable Windows/macOS browser behavior, Chrome 132, direct clipboard success, native TXT download, screen-reader and exhaustive concurrency checks remain pending as recorded above and in store/REVIEW.md. No Store submission, publisher account setup or paid service was performed.
+
+## Navigation fix — 1.0.1
+
+The action-header arrow now includes a visible «Назад» label on Export, Import, Add, edit and Remove screens. It remains outside the scrolling form. All 21 native popup checks passed in isolated Linux Chrome for Testing 154.0.8037.92, including returning from each footer action after scrolling and rejecting/accepting the dirty-form confirmation. Existing edit and import return paths use the same checked Back helper. [Export screenshot](screenshots/export-back.png).
+
+Typecheck, lint, 20 unit tests, build/package and exact ZIP/manifest resource validation passed. Versioned packaging reads package.json and checks manifest version consistency; CI collects the generated versioned ZIP. Own MIT notice is now included alongside third-party notices.
+
+`artifacts/cookiess-1.0.1.zip` matches the ten current dist files byte for byte. SHA256: `0ffeb183f1c816e28904d6edaef745ded1e99867a6d731177e6620deae932b5f`. The earlier 1.0.0 hash above describes the historical release. The new build does not close the previously documented Windows/macOS/Chrome 132/manual clipboard and TXT-download gaps. CI creates Actions artifacts; GitHub Releases remain separately published.

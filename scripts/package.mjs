@@ -6,7 +6,9 @@ const manifest = JSON.parse(readFileSync(path.join(root, 'manifest.json'), 'utf8
 for (const file of [manifest.action.default_popup, ...Object.values(manifest.icons)])
   readFileSync(path.join(root, file));
 mkdirSync('artifacts', { recursive: true });
-const zip = path.resolve('artifacts/cookiess-1.0.0.zip');
+const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+if (manifest.version !== version) throw new Error('Manifest/package versions differ');
+const zip = path.resolve(`artifacts/cookiess-${version}.zip`);
 const result = spawnSync(
   'python3',
   [

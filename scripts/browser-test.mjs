@@ -27,13 +27,14 @@ const pending = new Map();
 let seq = 0;
 let popupSend;
 let popupTarget;
+let acceptDialogs = true;
 const results = [];
 const errors = [];
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 cdp.on('Target.receivedMessageFromTarget', (event) => {
   const data = JSON.parse(event.message);
   if (data.method === 'Page.javascriptDialogOpening')
-    void popupSend('Page.handleJavaScriptDialog', { accept: true });
+    void popupSend('Page.handleJavaScriptDialog', { accept: acceptDialogs });
   if (data.method === 'Runtime.exceptionThrown') errors.push(data.params.exceptionDetails.text);
   const entry = pending.get(data.id);
   if (entry) {
@@ -98,7 +99,8 @@ async function input(selector, value) {
   );
 }
 async function back() {
-  await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').click()');
+  assert.equal(await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').textContent.trim()'), 'Назад');
+  await clickText('Назад');
   await idle();
 }
 async function shot(name) {
@@ -212,6 +214,26 @@ try {
       assert.match(await evaluate('document.body.innerText'), /Здесь пока нет cookies/);
     },
   );
+  await check('visible Back returns from every action after scrolling; dirty edits require confirmation', async () => {
+    for (const action of ['Export', 'Import', 'Add', 'Remove']) {
+      await clickText(action);
+      await evaluate('document.querySelector(".form")?.scrollTo(0, 100000)');
+      assert(await evaluate(`(()=>{const b=document.querySelector('[aria-label="Назад к списку"]');const r=b.getBoundingClientRect();return b.textContent.trim()==='Назад'&&r.top>=0&&r.bottom<=innerHeight;})()`));
+      if (action === 'Export') await shot('export-back');
+      if (action === 'Add') {
+        await input('#field-name', 'unsaved-synthetic');
+        acceptDialogs = false;
+        try {
+          await back();
+          assert.equal(await evaluate('document.querySelector("#field-name").value'), 'unsaved-synthetic');
+        } finally {
+          acceptDialogs = true;
+        }
+      }
+      await back();
+      assert(await evaluate('Boolean(document.querySelector(".search"))'));
+    }
+  });
   const base = {
     url: 'https://app.example.com/',
     secure: true,

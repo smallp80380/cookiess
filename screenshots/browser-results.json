@@ -5,6 +5,7 @@
     "manifest resources load; unsupported controller state; native popup has no-access state",
     "native permission denial is distinct from empty cookies",
     "native permission approval immediately loads list and survives popup reopen",
+    "visible Back returns from every action after scrolling; dirty edits require confirmation",
     "onChanged reloads all paths, correct parent/hostOnly scope and current partition only",
     "search, dark theme, keyboard focus and fixed popup dimensions",
     "editor displays attributes; save preserves session/HttpOnly/unspecified and re-reads API",

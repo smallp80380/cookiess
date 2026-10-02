@@ -1,7 +1,7 @@
 # Chrome Web Store preparation (not published)
 
 ## Single purpose
-Manage cookies applicable to the active website: view, create, edit, delete, and locally import/export them. Product name: Cookiess. Version: 1.0.0. Minimum Chrome: 132. Main language: Russian.
+Manage cookies applicable to the active website: view, create, edit, delete, and locally import/export them. Product name: Cookiess. Version: 1.0.1. Minimum Chrome: 132. Main language: Russian.
 
 ## Proposed listing
 

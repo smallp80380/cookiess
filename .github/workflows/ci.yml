@@ -68,7 +68,12 @@ jobs:
       - run: python scripts/unpack-test-package.py
       - name: Remove old screenshot evidence from the checkout
         run: python -c "import shutil; from pathlib import Path; shutil.rmtree('screenshots'); Path('screenshots').mkdir()"
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and Linux libraries
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+      - name: Install Chromium on Windows
+        if: runner.os == 'Windows'
+        run: npx playwright install chromium
       - name: Install Linux native UI tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb xdotool imagemagick

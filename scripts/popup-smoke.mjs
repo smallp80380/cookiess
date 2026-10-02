@@ -68,7 +68,7 @@ try {
       });
       assert(!result.exceptionDetails);
       state = result.result.value;
-      if (state.brand?.includes('Cookiess') && state.busy === false) break;
+      if (state.brand?.includes('Cookiess') && state.busy === false && state.body.includes('Доступ к сайту')) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     assert(state?.brand?.includes('Cookiess'), 'Popup JS initialized; no missing index/JS');

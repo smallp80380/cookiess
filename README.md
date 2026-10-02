@@ -8,7 +8,7 @@
 
 ## Установка готовой сборки
 
-1. Скачайте ZIP из [последнего релиза](https://github.com/smallp80380/cookiess/releases/latest) и распакуйте в отдельную папку. При сборке из исходников используйте `dist/` или `artifacts/cookiess-1.0.1.zip`.
+1. Скачайте ZIP из [последнего релиза](https://github.com/smallp80380/cookiess/releases/latest) и распакуйте в отдельную папку. При сборке из исходников используйте `dist/` или `artifacts/cookiess-1.0.2.zip`.
 2. В Chrome откройте `chrome://extensions` и включите «Режим разработчика».
 3. Нажмите «Загрузить распакованное расширение» и выберите папку с `manifest.json`.
 4. Закрепите Cookiess в панели расширений. Откройте HTTP/HTTPS-сайт и нажмите иконку.
@@ -74,7 +74,7 @@ Cookie values остаются в памяти popup и явно экспорт�
 
 ## CI и подготовка к магазину
 
-[GitHub Actions CI](https://github.com/smallp80380/cookiess/actions/workflows/ci.yml) проверяет typecheck, lint, unit-тесты, сборку и содержимое ZIP на Linux, Windows и macOS. Установочный ZIP сохраняется как артефакт Linux job. Это проверка сборки, а проверка настоящего popup остаётся отдельной.
+[GitHub Actions CI](https://github.com/smallp80380/cookiess/actions/workflows/ci.yml) проверяет typecheck, lint, unit-тесты, сборку и содержимое ZIP на Linux, Windows и macOS. Установочный ZIP сохраняется как артефакт Linux job. После этих проверок отдельные browser jobs загружают тот же установочный ZIP в новый синтетический профиль: Linux выполняет полный набор из 21 проверки настоящего popup; Windows проверяет загрузку ресурсов и два открытия native popup. Эти проверки обязательны перед обновлением Releases.
 
 [Политика конфиденциальности](https://smallp80380.github.io/cookiess/) · [Исходный текст](PRIVACY.md) · [Материалы карточки](store/LISTING.md) · [Инструкция и ручные проверки](store/REVIEW.md).
 
@@ -86,8 +86,10 @@ Cookie values остаются в памяти popup и явно экспорт�
 
 ## Автоматические сборки Releases
 
-После push в `main` и успешного CI на всех трёх ОС workflow обновляет [релиз latest-build](https://github.com/smallp80380/cookiess/releases/tag/latest-build). [Скачать свежий ZIP](https://github.com/smallp80380/cookiess/releases/download/latest-build/cookiess-latest.zip).
+После push в `main` и успешных проверок сборки на трёх ОС и браузерных jobs на Linux/Windows workflow обновляет [релиз latest-build](https://github.com/smallp80380/cookiess/releases/tag/latest-build). [Скачать свежий ZIP](https://github.com/smallp80380/cookiess/releases/download/latest-build/cookiess-latest.zip).
 
-Публикуется тот же ZIP, который был проверен Ubuntu job, с SHA-256 и `build-info.json` (версия, коммит, ссылка на CI). При ошибке проверки релиз не обновляется. PR не получает права публикации. Ручной запуск workflow для `main` также может обновить этот релиз.
+Публикуется тот же ZIP, который был проверен Ubuntu job, с SHA-256 и `build-info.json` (версия, коммит, ссылка на CI). При ошибке проверки сборки или настоящего popup релиз не обновляется. PR не получает права публикации. Ручной запуск workflow для `main` также может обновить этот релиз.
 
 `latest-build` — обновляемый предварительный релиз; тег указывает на опубликованный коммит. Версионные релизы `v1.0.0`, `v1.0.1` сохраняются отдельно. Публикации последовательно выполняются в одной группе workflow; устаревшая сборка пропускается, если в `main` уже появился новый коммит. После скачивания новой сборки распакуйте её в прежнюю папку и нажмите «Обновить» в `chrome://extensions` — автоматически установленное вручную расширение не обновляется.
+
+Если popup показывает `ERR_FILE_NOT_FOUND`, проверьте в `chrome://extensions` (или `brave://extensions`), что открываете актуальную установку. Загрузка новой версии из другой папки создаёт отдельное распакованное расширение с другим ID; старая иконка может остаться закреплённой и ссылаться на удалённую папку. Удалите старую установку, закрепите актуальную. Для обновлений лучше сохранять одну постоянную папку.

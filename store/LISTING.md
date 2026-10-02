@@ -1,7 +1,7 @@
 # Chrome Web Store listing — Russian
 
 Name: Cookiess
-Version: 1.0.1
+Version: 1.0.2
 Language: Russian (ru)
 Proposed category: Developer Tools (confirm the available dashboard category before submission).
 
@@ -32,7 +32,7 @@ Project: https://github.com/smallp80380/cookiess
 
 ## Uploads
 
-Package: release `v1.0.1`, `cookiess-1.0.1.zip`.
+Package: release `v1.0.2`, `cookiess-1.0.2.zip`.
 Screenshots, in order: `assets/01-list.png`, `02-editor.png`, `03-import.png`, `04-dark.png` (1280×800).
 Small promotional tile: `assets/promo-440x280.png` (440×280).
 Icon: `../public/icons/128.png` (128×128).

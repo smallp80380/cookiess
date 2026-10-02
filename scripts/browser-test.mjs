@@ -8,16 +8,15 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 const profile = mkdtempSync(path.join(tmpdir(), 'cookiess-test-'));
+const extensionRoot = path.resolve(process.env.EXTENSION_PATH ?? 'dist');
 const context = await chromium.launchPersistentContext(profile, {
-  executablePath:
-    process.env.CHROMIUM_PATH ??
-    '/home/ubuntu/.cache/ms-playwright/chromium-1246/chrome-linux64/chrome',
+  executablePath: process.env.CHROMIUM_PATH ?? chromium.executablePath(),
   headless: false,
   ignoreDefaultArgs: ['--disable-extensions'],
   args: [
     '--no-sandbox',
     '--enable-unsafe-extension-debugging',
-    `--load-extension=${path.resolve('dist')}`,
+    `--load-extension=${extensionRoot}`,
   ],
   viewport: { width: 1000, height: 800 },
   acceptDownloads: true,
@@ -184,9 +183,9 @@ try {
   await check(
     'manifest resources load; unsupported controller state; native popup has no-access state',
     async () => {
-      const manifest = JSON.parse(readFileSync('dist/manifest.json', 'utf8'));
+      const manifest = JSON.parse(readFileSync(path.join(extensionRoot, 'manifest.json'), 'utf8'));
       for (const file of [manifest.action.default_popup, ...Object.values(manifest.icons)])
-        assert(readFileSync(path.join('dist', file)).length);
+        assert(readFileSync(path.join(extensionRoot, file)).length);
       assert.match(await controller.locator('body').innerText(), /Сайт недоступен/);
       assert.match(await evaluate('document.body.innerText'), /Доступ к сайту/);
       await shot('permission');
@@ -214,14 +213,24 @@ try {
       assert.match(await evaluate('document.body.innerText'), /Здесь пока нет cookies/);
     },
   );
-  await check('visible Back returns from every action after scrolling; dirty edits require confirmation', async () => {
+  await check('Back sits opposite Refresh above host; refresh preserves every action and dirty draft', async () => {
     for (const action of ['Export', 'Import', 'Add', 'Remove']) {
       await clickText(action);
       await evaluate('document.querySelector(".form")?.scrollTo(0, 100000)');
       assert(await evaluate(`(()=>{const b=document.querySelector('[aria-label="Назад к списку"]');const r=b.getBoundingClientRect();return b.textContent.trim()==='Назад'&&r.top>=0&&r.bottom<=innerHeight;})()`));
+      assert(await evaluate(`(()=>{const b=document.querySelector('[aria-label="Назад к списку"]').getBoundingClientRect();const r=document.querySelector('[aria-label="Обновить сайт и cookies"]').getBoundingClientRect();const h=document.querySelector('.site h1').getBoundingClientRect();return Math.abs((b.top+b.bottom)/2-(r.top+r.bottom)/2)<2&&b.right<r.left&&b.bottom<h.top;})()`));
+      const heading = await evaluate('document.querySelector(".panel-title h2").textContent');
+      await evaluate('document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()');
+      await idle();
+      assert.equal(await evaluate('document.querySelector(".panel-title h2").textContent'), heading);
+      assert.equal(await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').disabled'), false);
       if (action === 'Export') await shot('export-back');
       if (action === 'Add') {
         await input('#field-name', 'unsaved-synthetic');
+        await evaluate('document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()');
+        await idle();
+        assert.equal(await evaluate('document.querySelector("#field-name").value'), 'unsaved-synthetic');
+        await shot('editor-navigation');
         acceptDialogs = false;
         try {
           await back();

@@ -1,6 +1,6 @@
 import './style.css';
 import { CookieApi, applyImport, previewImport, type ImportItem } from './api';
-import { accessPattern, identity, validateCookie, type Cookie, type SiteContext } from './domain';
+import { accessPattern, identity, partitionIdentity, validateCookie, type Cookie, type SiteContext } from './domain';
 import { parse, serialize, type Format } from './formats';
 const api = new CookieApi();
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -54,6 +54,7 @@ let sort = 'name';
 let allowed = false;
 let ready = false;
 let loadVersion = 0;
+let refreshPanel: (() => void) | undefined;
 const brand = el('header', 'brand');
 const logo = el('div', 'wordmark');
 logo.append(icon('cookie'), el('strong', '', 'Cookiess'), el('span', 'edition', 'LOCAL'));
@@ -88,13 +89,22 @@ siteText.append(host, contextLabel);
 const refresh = button(
   '',
   async () => {
-    if (leave()) await initialize();
+    await refreshCurrentView();
   },
   'icon-button',
   'refresh',
 );
 refresh.setAttribute('aria-label', 'Обновить сайт и cookies');
-site.append(siteText, refresh);
+const back = button('Назад', async () => {
+  if (!leave()) return;
+  notify('');
+  if (!ready || !allowed) await initialize();
+  else renderList();
+}, 'back-button', 'back');
+back.setAttribute('aria-label', 'Назад к списку');
+const navigation = el('div', 'site-navigation');
+navigation.append(back, refresh);
+site.append(navigation, siteText);
 const status = el('div', 'status');
 status.setAttribute('role', 'status');
 status.setAttribute('aria-live', 'polite');
@@ -118,6 +128,7 @@ function lock(value: boolean) {
   app.classList.toggle('busy', value);
   actionButtons.forEach((b) => (b.disabled = value || !allowed || !ready));
   refresh.disabled = value;
+  back.disabled = value || screen === 'list';
 }
 async function run(action: () => void | Promise<void>) {
   if (busy) return;
@@ -208,24 +219,33 @@ async function reload() {
   selected = new Set([...selected].filter((id) => cookies.some((c) => identity(c) === id)));
   if (screen === 'list') renderList();
 }
+async function refreshCurrentView() {
+  const next = await api.context();
+  if (context && next.tabId === context.tabId && next.host === context.host &&
+      next.storeId === context.storeId && new URL(next.url).origin === new URL(context.url).origin &&
+      await api.hasAccess(next)) {
+    // Keep the current form and its dirty draft when the site context is unchanged.
+    const key = next.partitionKey;
+    if (partitionIdentity(key) === partitionIdentity(context.partitionKey)) {
+      context = { ...next, partitionKey: key };
+      allowed = true;
+      ready = true;
+      await reload();
+      refreshPanel?.();
+      notify('Cookies обновлены. Текущая форма сохранена.', 'success');
+      return;
+    }
+  }
+  if (leave()) await initialize();
+}
 function backHeader(title: string) {
+  refreshPanel = undefined;
   const bar = el('div', 'panel-title');
-  const back = button(
-    'Назад',
-    () => {
-      if (leave()) {
-        screen = 'list';
-        renderList();
-      }
-    },
-    'back-button',
-    'back',
-  );
-  back.setAttribute('aria-label', 'Назад к списку');
-  bar.append(back, el('h2', '', title));
+  bar.append(el('h2', '', title));
   content.append(bar);
 }
 function renderList() {
+  refreshPanel = undefined;
   screen = 'list';
   dirty = false;
   content.replaceChildren();
@@ -562,6 +582,7 @@ function openRemove() {
   );
   all.disabled = !cookies.length;
   panel.append(removeSelected, all);
+  refreshPanel = openRemove;
   content.append(panel);
 }
 async function deleteMany(items: Cookie[]) {
@@ -674,6 +695,7 @@ function openImport() {
     invalidate();
   };
   policy.onchange = invalidate;
+  refreshPanel = invalidate;
   const inspect = button('Предпросмотр', async () => {
     notify('');
     await api.assertContext(context!);
@@ -775,6 +797,7 @@ function openExport() {
   }
   scope.onchange = refreshOutput;
   format.onchange = refreshOutput;
+  refreshPanel = refreshOutput;
   refreshOutput();
   panel.append(
     button(

@@ -41,9 +41,61 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+
+  browser:
+    name: Real installed popup (${{ matrix.os }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: cookiess-install-zip
+          path: artifacts
+      - run: python scripts/unpack-test-package.py
+      - name: Remove old screenshot evidence from the checkout
+        run: python -c "import shutil; from pathlib import Path; shutil.rmtree('screenshots'); Path('screenshots').mkdir()"
+      - run: npx playwright install --with-deps chromium
+      - name: Install Linux native UI tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool imagemagick
+      - name: Linux full native-popup suite against install ZIP
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:browser
+        env:
+          EXTENSION_PATH: test-output/unpacked
+      - name: Windows native-popup loading and navigation
+        if: runner.os == 'Windows'
+        run: node scripts/popup-smoke.mjs
+        env:
+          EXTENSION_PATH: test-output/unpacked
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-${{ matrix.os }}
+          path: |
+            screenshots/*.png
+            screenshots/browser-results.json
+            test-output/*.json
+            test-output/*.png
+          retention-days: 14
+
   release:
     name: Update latest-build release
-    needs: verify
+    needs: [verify, browser]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:

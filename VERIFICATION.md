@@ -90,3 +90,15 @@ Typecheck, lint, 20 unit tests, build/package and exact ZIP/manifest resource va
 ## Rolling GitHub release automation
 
 Workflow now updates the `latest-build` prerelease on successful main pushes or manual main runs, only after every verify matrix job succeeds. The release job alone receives contents:write and downloads the verified Ubuntu artifact. It validates the archive/version/resources, publishes a stable download filename plus SHA256SUMS and build-info (source commit/version/CI URL), and only moves the reserved latest-build tag. Versioned releases stay separate. PRs do not publish. Main workflows are not cancelled during publication; a superseded main commit is skipped before release mutation. YAML parsing, shell syntax and job dependency/permission gates were checked locally. Creation/update are verified through actual Actions runs and the downloaded release assets.
+
+## Install-ZIP browser gate
+
+CI now downloads the verified Ubuntu install artifact and extracts it into test-output/unpacked. Linux runs the existing 21 native action-popup checks against that folder; Windows runs a native popup smoke checking extension loading, packaged JS/CSS, the real permission screen and close/reopen. Each uses a new disposable synthetic profile. The release job depends on both build and browser matrices, so failures block rolling publication. Fresh browser evidence is uploaded separately, and prior checkout images are removed before tests.
+
+The portable smoke and all 21 install-ZIP checks were executed locally in Linux Chrome for Testing 154.0.8037.92. Windows execution is verified through the actual CI browser job, rather than inferred from build success. The reported missing-file symptom can also arise from duplicate unpacked installations when the older installed path has been deleted; this cannot be fixed by changing a correctly packaged popup. User profile metadata inspection, where authorized, is read-only; no cookie/password/history access is involved.
+
+## Navigation and refresh — 1.0.2
+
+Back and Refresh now share a persistent row above the site hostname. Back remains visible on the list (disabled when there is no internal destination) and active on action screens. Refresh on the same tab/origin/store/partition rereads cookies and retains the action and dirty editor/import text; export refreshes its output and import invalidates the old preview. A changed context still requires dirty-draft confirmation before resetting and preserves mutation guards.
+
+Typecheck, lint, 20 unit tests, build/ZIP checks and all 21 real native-popup tests passed locally against the extracted 1.0.2 install ZIP. The navigation regression asserts alignment above the hostname, retained action and enabled Back after Refresh, retained dirty Add draft, and cancelled/confirmed Back. Screenshot: [editor-navigation.png](screenshots/editor-navigation.png). CI adds the same Linux full suite and a Windows native-popup smoke as publication gates.

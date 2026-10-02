@@ -123,14 +123,18 @@ async function openPopup(opener) {
   const target = tabs.find((t) => t.url === site.url());
   if (opener) await opener.evaluate(() => chrome.action.openPopup());
   else await cdp.send('Extensions.triggerAction', { id: extensionId, targetId: target.targetId });
-  await delay(300);
-  const targets = (await cdp.send('Target.getTargets')).targetInfos;
-  const popup = targets.find((t) => t.url === controller.url() && !t.attached);
+  let popup;
+  for (let n = 0; n < 100 && !popup; n++) {
+    const targets = (await cdp.send('Target.getTargets')).targetInfos;
+    popup = targets.find((t) => t.url === controller.url() && !t.attached);
+    if (!popup) await delay(100);
+  }
   assert(popup, 'native action popup target exists');
   popupTarget = popup.targetId;
   popupSend = await attach(popup.targetId);
   await popupSend('Runtime.enable');
   await popupSend('Page.enable');
+  await waitFor("document.querySelector('.content')?.textContent && !document.querySelector('.content').textContent.includes('Определяем контекст активной вкладки')", 'popup initialization');
   await idle();
 }
 async function closePopup() {

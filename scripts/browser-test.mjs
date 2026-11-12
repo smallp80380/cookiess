@@ -838,9 +838,11 @@ try {
         await openPopup();
         await waitFor("document.querySelector('.list-summary')");
         assert.match(await evaluate('document.body.innerText'), /0 из 0 cookies/);
-        const stores = await evaluate(
-          '(async()=>{const tab=(await chrome.tabs.query({active:true,currentWindow:true}))[0];return (await chrome.cookies.getAllCookieStores()).find(s=>s.tabIds.includes(tab.id));})()',
-        );
+        // Use the store the popup resolved: Chromium 158 omits the incognito store from
+        // getAllCookieStores(), so asking that API here would test Chrome, not Cookiess.
+        const label = await evaluate("document.querySelector('.site p').textContent");
+        const stores = { id: /store (\S+)/.exec(label)?.[1] };
+        assert(stores.id, `popup shows its cookie store: ${label}`);
         assert.notEqual(stores.id, '0');
         await clickText('Добавить');
         await input('#field-name', 'synthetic-incognito');

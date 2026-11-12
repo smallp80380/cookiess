@@ -1,12 +1,14 @@
 <div align="center">
 
+**English** · [Русский](README_RU.md)
+
 <img src="public/icons/128.png" width="72" height="72" alt="">
 
 # Cookiess
 
-**Локальный менеджер cookies текущего сайта для Chrome**
+**A local cookie manager for the current site in Chrome**
 
-Просмотр, редактирование, импорт и экспорт — без сервера, аналитики и сетевых запросов.
+View, edit, import and export cookies — no server, no analytics, no network requests.
 
 [![CI](https://github.com/smallp80380/cookiess/actions/workflows/ci.yml/badge.svg)](https://github.com/smallp80380/cookiess/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/smallp80380/cookiess?label=release)](https://github.com/smallp80380/cookiess/releases/latest)
@@ -14,144 +16,146 @@
 ![Chrome 132+](https://img.shields.io/badge/Chrome-132%2B-2f4bb3)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-2f4bb3)
 
-[**Скачать**](https://github.com/smallp80380/cookiess/releases/latest/download/cookiess-latest.zip) · [Установка](#установка) · [Возможности](#возможности) · [Конфиденциальность](#конфиденциальность) · [Разработка](#разработка)
+[**Download**](https://github.com/smallp80380/cookiess/releases/latest/download/cookiess-latest.zip) · [Install](#install) · [Features](#features) · [Privacy](#privacy) · [Development](#development)
 
 <br>
 
-<img src="screenshots/list-light.png" width="380" alt="Список cookies сайта в светлой теме">&nbsp;&nbsp;<img src="screenshots/list-dark.png" width="380" alt="Список cookies сайта в тёмной теме">
+<img src="screenshots/list-light.png" width="380" alt="Site cookie list in the light theme">&nbsp;&nbsp;<img src="screenshots/list-dark.png" width="380" alt="Site cookie list in the dark theme">
 
 </div>
 
-## Возможности
+## Features
 
-- **Все cookies сайта в одном списке** — на любых путях, включая родительские домены и partitioned cookies текущего сайта. Чужие домены, другие вкладки и сторонние iframe в список не попадают.
-- **Быстрый поиск** по имени, значению, домену и пути; фильтр по флагам Secure, HttpOnly, session и partitioned; сортировка по имени, домену, пути или сроку.
-- **Понятный срок действия** — «через 3 дн.» прямо в списке, точная дата в подсказке, в редакторе — дата и время в местном часовом поясе.
-- **Полный редактор атрибутов** с проверкой ввода: домен, путь, Secure, HttpOnly, SameSite, срок, partition key. Префиксы `__Host-` и `__Secure-` проверяются по правилам браузера.
-- **Декодирование значений** — URL, Base64 и JWT показываются в читаемом виде.
-- **Безопасное удаление** — подтверждение, необязательная резервная копия и кнопка «Отменить», пока popup открыт.
-- **Импорт и экспорт** в Cookiess JSON, Cookie-Editor JSON и Netscape `cookies.txt` с предпросмотром, политикой конфликтов и прогрессом.
-- **Русский и английский интерфейс**, светлая, тёмная и системная темы, горячая клавиша <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd>.
+- **Every cookie of the site in one list** — on every path, including parent-domain and partitioned cookies of the current site. Other domains, other tabs and third-party iframes stay out.
+- **Fast search** by name, value, domain and path; filter by Secure, HttpOnly, session and partitioned; sort by name, domain, path or expiry.
+- **Readable expiry** — “in 3 d” right in the list, the exact date on hover, and a local date-and-time field in the editor.
+- **A full attribute editor** with validation: domain, path, Secure, HttpOnly, SameSite, expiry and partition key. `__Host-` and `__Secure-` prefixes are checked against the browser’s rules.
+- **Decoded values** — URL-encoded, Base64 and JWT values are shown in readable form.
+- **Safe removal** — confirmation, an optional backup file, and Undo while the popup stays open.
+- **Import and export** in Cookiess JSON, Cookie-Editor JSON and Netscape `cookies.txt`, with a preview, a conflict policy and progress.
+- **English and Russian UI**, light, dark and system themes, and the <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> shortcut.
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/editor-expiry.png" alt="Редактор: срок действия и предупреждение о лимите Chrome"></td>
-    <td width="33%"><img src="screenshots/import-dark.png" alt="Предпросмотр импорта с ошибками и пропусками"></td>
-    <td width="33%"><img src="screenshots/permission.png" alt="Запрос доступа к сайту"></td>
+    <td width="33%"><img src="screenshots/editor-expiry.png" alt="Editor: expiry and the Chrome lifetime limit warning"></td>
+    <td width="33%"><img src="screenshots/import-dark.png" alt="Import preview with errors and skipped records"></td>
+    <td width="33%"><img src="screenshots/permission.png" alt="Site access request"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Редактор и срок действия</sub></td>
-    <td align="center"><sub>Предпросмотр импорта</sub></td>
-    <td align="center"><sub>Запрос доступа к сайту</sub></td>
+    <td align="center"><sub>Editor and expiry</sub></td>
+    <td align="center"><sub>Import preview</sub></td>
+    <td align="center"><sub>Site access request</sub></td>
   </tr>
 </table>
 
-<sub>Все скриншоты — настоящий popup расширения с искусственными тестовыми данными.</sub>
+<sub>All screenshots show the real extension popup with synthetic test data. The interface follows your browser language; these were taken in Russian.</sub>
 
-## Установка
+## Install
 
-1. Скачайте [`cookiess-latest.zip`](https://github.com/smallp80380/cookiess/releases/latest/download/cookiess-latest.zip) и распакуйте его в постоянную папку.
-2. Откройте `chrome://extensions` и включите **Режим разработчика**.
-3. Нажмите **Загрузить распакованное расширение** и выберите папку с `manifest.json`.
-4. Закрепите Cookiess на панели, откройте любой HTTP/HTTPS-сайт и нажмите на иконку.
-5. При первом открытии сайта нажмите **Разрешить доступ** и подтвердите запрос Chrome.
+1. Download [`cookiess-latest.zip`](https://github.com/smallp80380/cookiess/releases/latest/download/cookiess-latest.zip) and unzip it into a permanent folder.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and select the folder that contains `manifest.json`.
+4. Pin Cookiess to the toolbar, open any HTTP/HTTPS site and click the icon.
+5. The first time on a site, click **Allow access** and confirm Chrome’s prompt.
 
-**Обновление.** Распакуйте новый архив в ту же папку и нажмите «Обновить» в `chrome://extensions`. Если загрузить версию из другой папки, Chrome создаст второе расширение, а старая иконка на панели может вести на удалённую папку и показывать `ERR_FILE_NOT_FOUND` — удалите старую установку.
+**Updating.** Unzip the new archive into the same folder and click Reload in `chrome://extensions`. Loading a new version from a different folder creates a second extension, and the old pinned icon may point to a deleted folder and show `ERR_FILE_NOT_FOUND` — remove the old installation.
 
-Работает в Chrome 132+ и браузерах на Chromium. В режиме инкогнито — только если вы отдельно разрешили это в настройках расширения; обычные и приватные cookies не смешиваются.
+Works in Chrome 132+ and other Chromium-based browsers. In incognito it works only if you allow it in the extension settings; normal and private cookies are never mixed.
 
-## Как это работает
+## How it works
 
-**Доступ.** Cookiess не получает доступ ко всем сайтам сразу. Разрешение запрашивается для зарегистрированного домена открытого сайта (например, `*.example.com`) — это нужно, чтобы видеть cookies родительского домена. Для `localhost` и IP-адресов доступ выдаётся на сам хост. Отозвать разрешение можно в настройках расширения.
+**Access.** Cookiess does not get access to every site at once. It asks for the registrable domain of the open site (for example `*.example.com`), which is needed to see parent-domain cookies. For `localhost` and IP addresses it asks for the host itself. You can revoke access in the extension settings.
 
-**Изменения.** Перед каждой записью Cookiess заново проверяет вкладку и разрешение, а после записи перечитывает реальный результат из Chrome. Если вкладка перешла на другой сайт, запись блокируется до обновления.
+**Changes.** Before every write Cookiess re-checks the tab and the permission, and after the write it re-reads the actual result from Chrome. If the tab has moved to another site, writes are blocked until you refresh.
 
-**Переименование.** Смена имени, домена, пути или partition создаёт новую cookie и затем удаляет прежнюю. Браузер не даёт сделать это атомарно, поэтому при сбое Cookiess сообщит, что обе записи остались в списке.
+**Renaming.** Changing a cookie’s name, domain, path or partition creates a new cookie and then removes the old one. The browser cannot do this atomically, so if the second step fails Cookiess tells you that both records are in the list.
 
-**Неоднозначное удаление.** API Chrome удаляет cookie по URL и имени. Если этому URL соответствуют несколько одноимённых cookies, Cookiess откажется удалять и подскажет порядок — сначала запись с более коротким путём.
+**Ambiguous removal.** Chrome removes cookies by URL and name. When several same-name cookies match that URL, Cookiess refuses to remove one and tells you the order to use — the record with the shorter path first.
 
-## Форматы файлов
+## File formats
 
-| Формат | Что сохраняет | Ограничения |
+| Format | Keeps | Limits |
 | --- | --- | --- |
-| **Cookiess JSON** | Все атрибуты Chrome и полный partition key | — |
-| **Cookie-Editor JSON** | Массив объектов, совместимый с Cookie-Editor | Не переносит store; `sameSite: null` означает Unspecified |
-| **Netscape `cookies.txt`** | Домен, путь, Secure, HttpOnly, срок, имя, значение | Теряет SameSite, store и partition; не допускает табуляций и переводов строк в значениях |
+| **Cookiess JSON** | Every Chrome attribute and the full partition key | — |
+| **Cookie-Editor JSON** | An array of objects compatible with Cookie-Editor | Drops the store; `sameSite: null` means Unspecified |
+| **Netscape `cookies.txt`** | Domain, path, Secure, HttpOnly, expiry, name, value | Loses SameSite, store and partition; no tabs or line breaks in values |
 
-Импорт всегда пишет в store текущей вкладки, пропускает записи других доменов и не удаляет существующие cookies. Размер файла — до 10 МБ. Срок больше 400 дней сокращается до лимита Chrome, и это видно в предпросмотре.
+Import always writes to the store of the current tab, skips records for other domains and never deletes existing cookies. Files can be up to 10 MB. Lifetimes over 400 days are shortened to Chrome’s limit, and the preview says so.
 
-Восстановление cookies из файла не гарантирует, что сайт примет старую сессию.
+Restoring cookies from a file does not guarantee the site will accept the old session.
 
-## Конфиденциальность
+## Privacy
 
-Cookiess работает только на вашем устройстве: никаких серверов, аналитики, рекламы и удалённого кода. Значения cookies не сохраняются в хранилище расширения и не пишутся в логи; файлы и буфер обмена используются только по вашему действию.
+Cookiess runs entirely on your device: no servers, analytics, ads or remote code. Cookie values are never saved to extension storage or written to logs; files and the clipboard are used only when you ask.
 
-| Разрешение | Зачем |
+| Permission | Why |
 | --- | --- |
-| `cookies` | Чтение и изменение cookies |
-| `activeTab` | Адрес сайта при нажатии на иконку — без доступа к истории и другим вкладкам |
-| `storage` | Выбранные тема и язык |
-| Доступ к сайтам (по запросу) | Cookies открытого сайта и его родительского домена — только после вашего подтверждения |
+| `cookies` | Read and change cookies |
+| `activeTab` | The site address when you click the icon — no access to history or other tabs |
+| `storage` | Your theme and language choice |
+| Site access (on request) | Cookies of the open site and its parent domain — only after you confirm |
 
-Полный текст: [политика конфиденциальности](https://smallp80380.github.io/cookiess/) ([исходник](PRIVACY.md)).
+Full text: [privacy policy](https://smallp80380.github.io/cookiess/) ([source](PRIVACY.md)).
 
-## Разработка
+## Development
 
-Нужны Node.js 22.12+ и npm.
+Requires Node.js 22.12+ and npm.
 
 ```sh
 npm ci
-npm run dev          # пересборка dist/ при изменениях → «Обновить» в chrome://extensions
-npm run build        # сборка в dist/
-npm run package      # сборка и ZIP в artifacts/ (нужен python3)
+npm run dev          # rebuild dist/ on change → Reload in chrome://extensions
+npm run build        # build into dist/
+npm run package      # build and zip into artifacts/ (needs python3)
 ```
 
-| Команда | Проверка |
+| Command | Checks |
 | --- | --- |
 | `npm run typecheck` | TypeScript |
-| `npm run lint` | ESLint для `src`, `tests` и `scripts` |
-| `npm run format:check` | Prettier (`npm run format` — исправить) |
-| `npm test` | Юнит-тесты Vitest |
-| `npm run test:coverage` | Юнит-тесты с порогами покрытия |
-| `npm run test:browser` | Сценарии в настоящем popup Chromium |
+| `npm run lint` | ESLint for `src`, `tests` and `scripts` |
+| `npm run format:check` | Prettier (`npm run format` to fix) |
+| `npm test` | Vitest unit tests |
+| `npm run test:coverage` | Unit tests with coverage thresholds |
+| `npm run test:browser` | Scenarios in the real Chromium popup |
 
-Браузерные тесты запускают распакованное расширение в отдельном временном профиле и проходят 22 сценария в настоящем popup: разрешения, редактирование, импорт и экспорт, инкогнито. Нужны Linux, Xvfb, xdotool и Chromium 154+:
+The browser suite loads the unpacked extension into a fresh temporary profile and runs 22 scenarios in the real popup: permissions, editing, import and export, incognito. It needs Linux, Xvfb, xdotool and Chromium 154+:
 
 ```sh
 CHROMIUM_PATH=/usr/bin/chromium xvfb-run -a npm run test:browser
 ```
 
-Тесты используют только синтетические cookies и перезаписывают снимки в `screenshots/`. Подробности — в [VERIFICATION.md](VERIFICATION.md).
+The tests use synthetic cookies only and overwrite the images in `screenshots/`. Details are in [VERIFICATION.md](VERIFICATION.md).
 
-### Структура
+### Project layout
 
 ```text
 src/
-  main.ts        интерфейс popup
-  api.ts         работа с Chrome API: доступ, запись, удаление, импорт
-  domain.ts      правила доменов, identity cookies, проверка атрибутов
-  formats.ts     разбор и запись трёх форматов файлов
-  view.ts        фильтры, сортировка, сроки
+  main.ts        popup interface
+  api.ts         Chrome API: access, writes, removal, import
+  domain.ts      domain rules, cookie identity, attribute validation
+  formats.ts     parsing and writing the three file formats
+  view.ts        filters, sorting, expiry
   decode.ts      URL, Base64, JWT
-  i18n.ts        выбор языка; строки — в src/locales/
-public/          manifest.json, иконки, _locales/
-tests/           юнит-тесты
-scripts/         браузерные тесты, упаковка, релизы
+  i18n.ts        language selection; strings live in src/locales/
+public/          manifest.json, icons, _locales/
+tests/           unit tests
+scripts/         browser tests, packaging, releases
 ```
 
-### Релизы
+### Releases
 
-Каждый коммит в `main`, прошедший CI на Linux, Windows и macOS и браузерные проверки, публикуется как [релиз](https://github.com/smallp80380/cookiess/releases) с версией `X.Y.Z.N`: базовая версия из `package.json` и номер сборки. К релизу прикладываются ZIP, SHA-256 и `build-info.json`. Чтобы начать новую линейку версий, измените `version` в `package.json` и `public/manifest.json`.
+Every commit to `main` that passes CI on Linux, Windows and macOS and the browser checks is published as a [release](https://github.com/smallp80380/cookiess/releases) versioned `X.Y.Z.N`: the base version from `package.json` plus the build number. Each release carries the ZIP, its SHA-256 and `build-info.json`. To start a new version line, change `version` in `package.json` and `public/manifest.json`.
 
-## Документация
+## Documentation
 
-- [ROADMAP.md](ROADMAP.md) — план развития
-- [CHANGELOG.md](CHANGELOG.md) — история изменений
-- [DESIGN.md](DESIGN.md) — визуальный стиль
-- [CONTRIBUTING.md](CONTRIBUTING.md) — как предложить изменения
-- [SECURITY.md](SECURITY.md) — как сообщить об уязвимости
-- [store/](store/) — материалы для Chrome Web Store
+Project documents are written in Russian.
 
-## Лицензия
+- [ROADMAP.md](ROADMAP.md) — plans
+- [CHANGELOG.md](CHANGELOG.md) — change history
+- [DESIGN.md](DESIGN.md) — visual direction (English)
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose changes
+- [SECURITY.md](SECURITY.md) — reporting a vulnerability (summary in English)
+- [store/](store/) — Chrome Web Store materials
 
-[MIT](LICENSE). Лицензии встроенных компонентов (tldts, шрифт Onest под SIL OFL 1.1) — в [THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt).
+## License
+
+[MIT](LICENSE). Licenses of bundled components (tldts, the Onest typeface under SIL OFL 1.1) are in [THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt).

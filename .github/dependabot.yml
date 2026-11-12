@@ -1,18 +1,30 @@
 version: 2
+# Monthly, and related packages arrive together in one pull request, so each PR can be
+# installed and tested on its own (eslint with @eslint/js, vitest with its coverage plugin).
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-    groups:
-      dev-tooling:
-        dependency-type: development
-        update-types: [minor, patch]
+      interval: monthly
     open-pull-requests-limit: 5
+    ignore:
+      # Vite 8's Oxc minifier inlines tldts' public-suffix trie constants and doubles the popup
+      # bundle (186 KB -> 326 KB). Revisit when that is fixed; see ROADMAP.md.
+      - dependency-name: vite
+        update-types: ['version-update:semver-major']
+    groups:
+      lint:
+        patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'globals', 'prettier']
+      test:
+        patterns: ['vitest', '@vitest/*', 'playwright']
+      build:
+        patterns: ['vite', 'typescript', '@types/*']
+      runtime:
+        patterns: ['tldts']
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       actions:
         patterns: ['*']

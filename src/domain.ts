@@ -39,6 +39,12 @@ export function inScope(cookie: Cookie, context: SiteContext): boolean {
       partitionIdentity(cookie.partitionKey) === partitionIdentity(context.partitionKey))
   );
 }
+// Splits a host into its subdomain part and the registrable domain access is granted for.
+export function splitHost(host: string): [string, string] {
+  const root = getDomain(host, { allowPrivateDomains: true });
+  if (!root || root === host || !host.endsWith(`.${root}`)) return ['', host];
+  return [host.slice(0, -root.length), root];
+}
 export function accessPattern(host: string): string {
   const domain = getDomain(host, { allowPrivateDomains: true });
   return `*://${domain ? `*.${domain}` : host}/*`;

@@ -8,8 +8,8 @@ export const ru = {
   language: 'Язык',
   languageAuto: 'Авто',
   currentSite: 'Текущий сайт',
-  contextDefault: 'Все пути · только контекст вкладки',
-  contextLabel: 'Все пути · store {store} · текущая partition',
+  contextDefault: 'Все пути в контексте текущей вкладки',
+  contextLabel: 'Все пути в store {store} и текущей partition',
   refreshLabel: 'Обновить сайт и cookies',
   back: 'Назад',
   backLabel: 'Назад к списку',
@@ -51,7 +51,7 @@ export const ru = {
   selectAllVisible: 'Выбрать все видимые записи',
   listLabel: 'Cookies сайта',
   countSummary: '{visible} из {total} cookies',
-  countSelected: ' · выбрано {n}',
+  countSelected: ', выбрано {n}',
   nothingFound: 'Ничего не найдено',
   nothingFoundText: 'Попробуйте другой запрос или фильтр.',
   noCookiesTitle: 'Здесь пока нет cookies',
@@ -117,7 +117,7 @@ export const ru = {
   removedMany: 'Удалено {done} из {total}.',
   errorsCount: 'Ошибок: {n}.',
   // Import
-  importTitle: 'Импорт · локальный файл',
+  importTitle: 'Импорт из файла или текста',
   importFile: 'Файл JSON / cookies.txt',
   importPaste: 'Или вставьте текст',
   fileTooLarge: 'Файл больше 10 MB.',
@@ -140,7 +140,7 @@ export const ru = {
   importNote:
     'Store источника игнорируется. Только текущий сайт и top-level partition. Существующие cookies не очищаются.',
   // Export
-  exportTitle: 'Экспорт · локальная копия',
+  exportTitle: 'Экспорт в файл',
   exportScope: 'Область экспорта',
   exportAll: 'Все cookies сайта ({n})',
   exportSelected: 'Выбранные ({n})',

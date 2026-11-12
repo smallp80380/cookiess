@@ -4,6 +4,7 @@ import { decodeValue } from './decode';
 import {
   accessPattern,
   clampLifetime,
+  splitHost,
   identity,
   partitionIdentity,
   validateCookie,
@@ -45,6 +46,7 @@ const icons: Record<string, string> = {
   refresh: '<path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 7M4 12l2 7a7 7 0 0 0 12-2"/>',
   back: '<path d="m14 5-7 7 7 7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
 };
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -60,6 +62,12 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function icon(name: string): SVGSVGElement {
   const span = el('span');
   span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? ''}</svg>`;
+  return span.firstElementChild as SVGSVGElement;
+}
+// The brand mark is the only filled drawing: a baked cookie with one bite taken out.
+function brandMark(className = 'brand-mark'): SVGSVGElement {
+  const span = el('span');
+  span.innerHTML = `<svg class="${className}" viewBox="0 0 32 32" aria-hidden="true"><path class="mark-dough" d="M27.6 10.2a4.2 4.2 0 0 1-5.8-5.6A13 13 0 1 0 29 15.4a4.2 4.2 0 0 1-1.4-5.2Z"/><circle class="mark-chip" cx="11" cy="12" r="2"/><circle class="mark-chip" cx="18.5" cy="17.5" r="2.2"/><circle class="mark-chip" cx="10.5" cy="21" r="1.6"/><circle class="mark-chip" cx="21.5" cy="24" r="1.3"/></svg>`;
   return span.firstElementChild as SVGSVGElement;
 }
 function button(
@@ -104,7 +112,7 @@ let refreshPanel: (() => void) | undefined;
 let lastDeleted: Cookie[] = [];
 const brand = el('header', 'brand');
 const logo = el('div', 'wordmark');
-logo.append(icon('cookie'), el('strong', '', 'Cookiess'), el('span', 'edition', 'LOCAL'));
+logo.append(brandMark(), el('strong', '', 'Cookiess'));
 const theme = select(
   t('theme'),
   [
@@ -241,7 +249,7 @@ function leave(): boolean {
 function state(title: string, message: string, cta?: HTMLButtonElement) {
   content.replaceChildren();
   const box = el('div', 'empty');
-  box.append(icon('cookie'), el('h2', '', title), el('p', 'muted', message));
+  box.append(brandMark('empty-mark'), el('h2', '', title), el('p', 'muted', message));
   if (cta) box.append(cta);
   content.append(box);
 }
@@ -260,7 +268,12 @@ async function initialize() {
     const next = await api.context();
     if (version !== loadVersion) return;
     context = next;
-    host.textContent = context.host;
+    // The registrable domain is what access is granted for; the subdomain part is quieter.
+    const [prefix, root] = splitHost(context.host);
+    host.replaceChildren(
+      ...(prefix ? [el('span', 'host-prefix', prefix)] : []),
+      el('span', 'host-root', root),
+    );
     host.title = context.host;
     contextLabel.textContent = t('contextLabel', { store: context.storeId });
     allowed = await api.hasAccess(context);
@@ -396,7 +409,9 @@ function renderList() {
   dirty = false;
   content.replaceChildren();
   const tools = el('div', 'tools');
+  const searchField = el('label', 'search-field');
   const search = el('input', 'search');
+  searchField.append(icon('search'), search);
   search.type = 'search';
   search.placeholder = t('searchPlaceholder');
   search.setAttribute('aria-label', t('searchLabel'));
@@ -423,7 +438,7 @@ function renderList() {
     ],
     sort,
   );
-  tools.append(search, filter, order);
+  tools.append(searchField, filter, order);
   const summary = el('div', 'list-summary');
   const count = el('span');
   const all = el('input');
@@ -457,6 +472,7 @@ function renderList() {
     }
     for (const cookie of visible) {
       const row = el('div', 'cookie-row');
+      row.classList.toggle('selected', selected.has(identity(cookie)));
       const label = `${unnamed(cookie)} ${cookie.path}`;
       const checkbox = el('input');
       checkbox.type = 'checkbox';
@@ -472,19 +488,24 @@ function renderList() {
       const first = el('div', 'row-first');
       first.append(el('strong', 'cookie-name', unnamed(cookie)));
       const flags = el('span', 'flags');
-      for (const f of [
-        cookie.secure ? 'S' : '',
-        cookie.httpOnly ? 'H' : '',
-        cookie.partitionKey ? 'P' : '',
-        cookie.session ? 'session' : '',
-      ])
-        if (f) flags.append(el('small', 'flag', f));
+      for (const [on, text, kind, title] of [
+        [cookie.secure, 'S', 'secure', 'Secure'],
+        [cookie.httpOnly, 'H', 'http', 'HttpOnly'],
+        [Boolean(cookie.partitionKey), 'P', 'partition', 'Partitioned'],
+        [cookie.session, 'session', 'session', 'Session'],
+      ] as const)
+        if (on) {
+          const chip = el('small', 'flag', text);
+          chip.dataset.flag = kind;
+          chip.title = title;
+          flags.append(chip);
+        }
       first.append(flags);
       const value = el('span', 'cookie-value', cookie.value || t('emptyValue'));
       const scope = el('span', 'cookie-scope');
-      scope.append(`${cookie.domain} · ${cookie.path}`);
+      scope.append(el('span', 'scope-text', `${cookie.domain}${cookie.path}`));
       if (!cookie.session && cookie.expirationDate !== undefined) {
-        const expiry = el('span', 'cookie-expiry', ` · ${expiryLabel(cookie)}`);
+        const expiry = el('span', 'cookie-expiry', expiryLabel(cookie));
         expiry.title = formatDate(cookie.expirationDate);
         scope.append(expiry);
       }

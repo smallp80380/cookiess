@@ -118,3 +118,7 @@ Changes: English UI and `_locales`, Russian button labels, expiry display/date-t
 The unchanged 1.0.2 suite was also re-run on the same machine before these changes (21/21 passed) to separate environment effects from regressions. Screenshots in `screenshots/` and store compositions in `store/assets/` were regenerated from this run; `editor-expiry.png` is new.
 
 Not verified by this run: Windows smoke and macOS (CI only), screen reader, English UI in the native suite (unit-tested strings only), real clipboard success (manual fallback path as before).
+
+### Visual redesign (same release)
+
+New palette, packaged Onest font (Cyrillic + Latin subsets, ~50 KB, OFL notice in `THIRD_PARTY_NOTICES.txt`), compact header, flag chips and continuous list sheet; see [DESIGN.md](DESIGN.md). The native-popup suite was re-run after the redesign: **22/22 passed**, popup still exactly 460×590 without horizontal scroll at 220+ rows. A theme-switch flash caused by colour transitions was found in the dark screenshot and removed. Screenshots and store compositions were regenerated.

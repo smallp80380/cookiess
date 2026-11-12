@@ -27,13 +27,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      # Before stamping: the stamp rewrites manifest.json with JSON.stringify formatting.
+      - name: Check formatting (Linux; Windows checkouts use CRLF)
+        if: runner.os == 'Linux'
+        run: npm run format:check
       - name: Stamp build number into version
         run: node scripts/stamp-version.mjs ${{ github.run_number }}
       - run: npm run typecheck
       - run: npm run lint
-      - name: Check formatting (Linux; Windows checkouts use CRLF)
-        if: runner.os == 'Linux'
-        run: npm run format:check
       - run: npm run test:coverage
       - run: npm run package
       - name: Verify packaged manifest and resources

@@ -10,6 +10,7 @@ import {
   type SiteContext,
 } from './domain';
 import { t } from './i18n';
+const INCOGNITO_STORE_ID = '1';
 export class CookieApi {
   constructor(private api: typeof chrome = chrome) {}
   async context(): Promise<SiteContext> {
@@ -19,8 +20,10 @@ export class CookieApi {
     if (tab?.id && !tab.url) throw new Error(t('errTabUrl'));
     if (!tab?.id || !tab.url || !/^https?:/.test(tab.url)) throw new Error(t('errNotSite'));
     const stores = await this.api.cookies.getAllCookieStores();
-    const store = stores.find((s) => s.tabIds.includes(tab.id!));
-    if (!store) throw new Error(t('errStore'));
+    const storeId =
+      stores.find((s) => s.tabIds.includes(tab.id!))?.id ??
+      (tab.incognito ? await this.incognitoStoreId() : undefined);
+    if (!storeId) throw new Error(t('errStore'));
     const host = new URL(tab.url).hostname;
     // getPartitionKey itself needs host permission for the schemeful top-level site.
     // Resolve only after consent; an inaccessible context can never be used to write.
@@ -28,7 +31,18 @@ export class CookieApi {
     const partitionKey = hasAccess
       ? (await this.api.cookies.getPartitionKey({ tabId: tab.id, frameId: 0 })).partitionKey
       : {};
-    return { tabId: tab.id, url: tab.url, host, storeId: store.id, partitionKey };
+    return { tabId: tab.id, url: tab.url, host, storeId, partitionKey };
+  }
+  // Chromium 158 omits the incognito store from getAllCookieStores(), even when called from
+  // the incognito (split) context, while getAll() there accepts only that store. Chrome's
+  // incognito store id is "1": use it only when the API confirms it is valid in this context.
+  private async incognitoStoreId(): Promise<string | undefined> {
+    return this.api.cookies
+      .getAll({ storeId: INCOGNITO_STORE_ID, domain: 'cookiess.invalid' })
+      .then(
+        () => INCOGNITO_STORE_ID,
+        () => undefined,
+      );
   }
   async assertContext(context: SiteContext): Promise<void> {
     const current = await this.context();

@@ -208,4 +208,24 @@ describe('safe API operations', () => {
       /не атомарна/,
     );
   });
+  it('finds the incognito store when Chrome omits it from getAllCookieStores (Chromium 158)', async () => {
+    const { api, browser } = fake();
+    browser.tabs.query.mockResolvedValue([{ id: 1, url: ctx.url, incognito: true }] as never);
+    browser.cookies.getAllCookieStores.mockResolvedValue([{ id: '0', tabIds: [7] }] as never);
+    expect((await api.context()).storeId).toBe('1');
+    expect(browser.cookies.getAll).toHaveBeenCalledWith(expect.objectContaining({ storeId: '1' }));
+  });
+  it('still refuses an unknown store when Chrome rejects the incognito fallback', async () => {
+    const { api, browser } = fake();
+    browser.tabs.query.mockResolvedValue([{ id: 1, url: ctx.url, incognito: true }] as never);
+    browser.cookies.getAllCookieStores.mockResolvedValue([{ id: '0', tabIds: [7] }] as never);
+    browser.cookies.getAll.mockRejectedValueOnce(new Error('Invalid cookie store id'));
+    await expect(api.context()).rejects.toThrow(/cookie store/);
+  });
+  it('does not guess a store for a regular tab missing from the list', async () => {
+    const { api, browser } = fake();
+    browser.cookies.getAllCookieStores.mockResolvedValue([{ id: '0', tabIds: [7] }] as never);
+    await expect(api.context()).rejects.toThrow(/cookie store/);
+    expect(browser.cookies.getAll).not.toHaveBeenCalled();
+  });
 });

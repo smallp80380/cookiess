@@ -12,6 +12,10 @@ updates:
       # bundle (186 KB -> 326 KB). Revisit when that is fixed; see ROADMAP.md.
       - dependency-name: vite
         update-types: ['version-update:semver-major']
+      # typescript-eslint 8.72 supports TypeScript >=4.8.4 <6.1.0; a TypeScript major breaks
+      # npm install until typescript-eslint ships support. Revisit then; see ROADMAP.md.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       lint:
         patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'globals', 'prettier']

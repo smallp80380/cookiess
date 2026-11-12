@@ -7,6 +7,7 @@ import {
   validateCookie,
   type Cookie,
   type SiteContext,
+  CHROME_MAX_COOKIE_AGE_SECONDS,
 } from './domain';
 export class CookieApi {
   constructor(private api: typeof chrome = chrome) {}
@@ -169,15 +170,25 @@ export function previewImport(
   const known = new Set(current.map(storageIdentity));
   return cookies.map((source) => {
     const cookie = { ...source, storeId: context.storeId };
+    // Chrome silently caps lifetimes at 400 days. Cap here, before writing, so the
+    // preview states what will be stored and the write is not reported as failed.
+    const cap = Date.now() / 1000 + CHROME_MAX_COOKIE_AGE_SECONDS;
+    const clamped =
+      !cookie.session && cookie.expirationDate !== undefined && cookie.expirationDate > cap;
+    if (clamped) cookie.expirationDate = Math.floor(cap);
     const errors = validateCookie(cookie, context);
     if (Object.keys(errors).length)
       return { cookie, action: 'skip', reason: Object.values(errors).join(' ') };
     const exists = known.has(storageIdentity(cookie));
     known.add(storageIdentity(cookie));
+    const notes = [
+      ...(clamped ? ['Срок сокращён до 400 дней (ограничение Chrome).'] : []),
+      ...(exists && policy === 'skip' ? ['Identity уже существует.'] : []),
+    ];
     return {
       cookie,
       action: exists ? (policy === 'skip' ? 'skip' : 'replace') : 'add',
-      ...(exists && policy === 'skip' ? { reason: 'Identity уже существует.' } : {}),
+      ...(notes.length ? { reason: notes.join(' ') } : {}),
     };
   });
 }

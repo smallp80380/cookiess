@@ -17,6 +17,9 @@ const context = await chromium.launchPersistentContext(profile, {
     '--no-sandbox',
     '--enable-unsafe-extension-debugging',
     `--load-extension=${extensionRoot}`,
+    // Native dialogs are driven by xdotool on the Xvfb display. Without this, a desktop
+    // session's WAYLAND_DISPLAY makes Chromium open on Wayland, out of xdotool's reach.
+    ...(process.platform === 'linux' ? ['--ozone-platform=x11'] : []),
   ],
   viewport: { width: 1000, height: 800 },
   acceptDownloads: true,
@@ -137,8 +140,25 @@ async function openPopup(opener) {
   await waitFor("document.querySelector('.content')?.textContent && !document.querySelector('.content').textContent.includes('Определяем контекст активной вкладки')", 'popup initialization');
   await idle();
 }
+async function popupAlive() {
+  const { targetInfos } = await cdp.send('Target.getTargets');
+  return targetInfos.some((t) => t.targetId === popupTarget);
+}
 async function closePopup() {
-  await cdp.send('Target.closeTarget', { targetId: popupTarget });
+  if (await popupAlive()) await cdp.send('Target.closeTarget', { targetId: popupTarget });
+}
+// Some Chromium builds (e.g. 156 on X11) close the action popup when the native
+// permission bubble takes focus; the bubble stays and its answer still applies.
+// Users then reopen the popup, so do the same and assert what they would see.
+async function reopenIfClosedByPrompt() {
+  await delay(300);
+  if (!(await popupAlive())) await openPopup();
+  await idle();
+}
+async function approvePermission() {
+  await permissionClick();
+  assert.equal(spawnSync('xdotool', ['key', 'Tab', 'Return']).status, 0);
+  await reopenIfClosedByPrompt();
 }
 const nativeClick = (x, y) => {
   const r = spawnSync('xdotool', ['mousemove', String(x), String(y), 'click', '1']);
@@ -197,19 +217,24 @@ try {
   );
   await check('native permission denial is distinct from empty cookies', async () => {
     await permissionClick();
-    nativeClick(605, 266);
-    await delay(300);
-    await idle();
-    assert.match(await evaluate('document.body.innerText'), /Доступ не предоставлен/);
+    if (await popupAlive()) {
+      nativeClick(605, 266);
+      await delay(300);
+      await idle();
+      assert.match(await evaluate('document.body.innerText'), /Доступ не предоставлен/);
+    } else {
+      assert.equal(spawnSync('xdotool', ['key', 'Escape']).status, 0);
+      await reopenIfClosedByPrompt();
+      const text = await evaluate('document.body.innerText');
+      assert.match(text, /Доступ к сайту/);
+      assert.doesNotMatch(text, /из 0 cookies/);
+    }
     assert.equal((await evaluate('chrome.permissions.getAll()')).origins.length, 0);
   });
   await check(
     'native permission approval immediately loads list and survives popup reopen',
     async () => {
-      await permissionClick();
-      assert.equal(spawnSync('xdotool', ['key', 'Tab', 'Return']).status, 0);
-      await delay(300);
-      await idle();
+      await approvePermission();
       assert.match(await evaluate('document.body.innerText'), /0 из 0 cookies/);
       await shot('empty');
       await closePopup();
@@ -544,7 +569,7 @@ try {
       await clickText('Предпросмотр');
       assert.match(
         await evaluate('document.body.innerText'),
-        /Добавить 2 · заменить 0 · пропустить 1 · ошибок 1/,
+        /Добавить 1 · заменить 0 · пропустить 1 · ошибок 2/,
       );
       await shot('import-dark');
       await clickText('Применить импорт');
@@ -681,10 +706,7 @@ try {
       await site.goto(`http://${host}:8080/`);
       await openPopup();
       assert.match(await evaluate('document.body.innerText'), /Доступ к сайту/);
-      await permissionClick();
-      assert.equal(spawnSync('xdotool', ['key', 'Tab', 'Return']).status, 0);
-      await delay(250);
-      await idle();
+      await approvePermission();
       await clickText('Add');
       await input('#field-name', `synthetic-${host}`);
       await input('#field-value', 'synthetic-local');

@@ -30,6 +30,11 @@ function record(input: unknown, index: number, result: ParseResult, legacy = fal
   // These adaptations belong only to the detected legacy array, never Cookiess v1.
   if (legacy && data.storeId === null) data.storeId = '';
   if (legacy && data.sameSite === null) data.sameSite = 'unspecified';
+  // Other exporters (EditThisCookie, DevTools copies) write "Lax", "Strict" or "None".
+  if (legacy && typeof data.sameSite === 'string') {
+    const value = data.sameSite.toLowerCase();
+    data.sameSite = value === 'none' ? 'no_restriction' : value;
+  }
   for (const field of ['name', 'value', 'domain', 'path'])
     if (typeof data[field] !== 'string') return fail(`поле ${field} должно быть строкой.`);
   for (const field of ['hostOnly', 'secure', 'httpOnly', 'session'])

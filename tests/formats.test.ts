@@ -82,4 +82,36 @@ describe('file contracts', () => {
     expect(result.cookies[0].value).toBe('<script>alert(1)</script>');
     expect(result.warnings).toHaveLength(1);
   });
+  it('re-imports every name Chrome stores, so an export is never refused by its own import', () => {
+    const names = ['a b', 'a(b)', 'a"b', 'a,b', 'a:b', 'a/b', 'a[b]', 'a{b}', 'a?b', 'a@b', 'a<b>', 'a\\b', 'имя'];
+    const cookies = names.map((name) => ({ ...cookie, name }));
+    for (const format of ['cookiess', 'cookie-editor'] as const) {
+      const parsed = parse(serialize(cookies, format).text);
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.cookies.map((c) => c.name)).toEqual(names);
+    }
+  });
+  it("refuses records over Chrome's size limits at parse time, counting UTF-8 bytes", () => {
+    const fits = { ...cookie, name: 'n', value: 'x'.repeat(4095) };
+    expect(parse(JSON.stringify([fits])).errors).toEqual([]);
+    for (const bad of [
+      { ...cookie, name: 'n', value: 'x'.repeat(4096) },
+      { ...cookie, name: 'n', value: 'я'.repeat(2048) },
+      { ...cookie, path: '/' + 'p'.repeat(1024) },
+    ])
+      expect(parse(JSON.stringify([bad])).errors[0]).toMatch(/лимит Chrome/);
+  });
+  it('normalizes foreign SameSite spellings only in legacy arrays', () => {
+    const spellings = { Lax: 'lax', STRICT: 'strict', None: 'no_restriction', no_restriction: 'no_restriction' };
+    for (const [input, expected] of Object.entries(spellings))
+      expect(parse(JSON.stringify([{ ...cookie, sameSite: input }])).cookies[0].sameSite).toBe(expected);
+    expect(
+      parse(JSON.stringify({ format: 'cookiess', version: 1, cookies: [{ ...cookie, sameSite: 'Lax' }] })).errors,
+    ).toHaveLength(1);
+  });
+  it('still refuses names Chrome refuses (control chars, =, ;, outer spaces)', () => {
+    for (const name of ['a=b', 'a;b', 'a\u0001b', ' lead', 'trail ', 'a\tb']) {
+      expect(parse(JSON.stringify([{ ...cookie, name }])).errors).toHaveLength(1);
+    }
+  });
 });

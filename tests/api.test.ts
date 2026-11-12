@@ -121,4 +121,12 @@ describe('safe API operations', () => {
     expect(result.skipped).toBe(1);
     expect(set).not.toHaveBeenCalled();
   });
+  it("caps lifetimes beyond Chrome's 400-day limit in the preview instead of reporting a failed write", () => {
+    const far = Date.now() / 1000 + 1000 * 86400;
+    const [item] = previewImport([{ ...cookie, session: false, expirationDate: far }], [], ctx, 'replace');
+    expect(item.action).toBe('add');
+    expect(item.cookie.expirationDate!).toBeLessThan(far);
+    expect(item.cookie.expirationDate! - Date.now() / 1000).toBeCloseTo(400 * 86400, -2);
+    expect(item.reason).toMatch(/400 дней/);
+  });
 });

@@ -13,11 +13,8 @@ const context = await chromium.launchPersistentContext(profile, {
   executablePath: process.env.CHROMIUM_PATH ?? chromium.executablePath(),
   headless: false,
   ignoreDefaultArgs: ['--disable-extensions'],
-  // Assertions read the Russian UI; pin the browser language so "Язык браузера" resolves to ru.
-  env: { ...process.env, LANGUAGE: 'ru', LANG: 'ru_RU.UTF-8' },
   args: [
     '--no-sandbox',
-    '--lang=ru',
     '--enable-unsafe-extension-debugging',
     `--load-extension=${extensionRoot}`,
     // Native dialogs are driven by xdotool on the Xvfb display. Without this, a desktop
@@ -194,6 +191,10 @@ try {
   extensionId = installed.extensions.find((e) => e.name === 'Cookiess').id;
   controller = await context.newPage();
   await controller.goto(`chrome-extension://${extensionId}/index.html`);
+  // Assertions read the Russian UI. Pin the extension's own language setting instead of
+  // --lang: the browser UI (native permission bubble, clicked by coordinates) stays as is.
+  await controller.evaluate(() => chrome.storage.local.set({ lang: 'ru' }));
+  await controller.reload();
   await context.route('https://**/*', (route) =>
     route.fulfill({
       status: 200,

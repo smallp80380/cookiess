@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Cookiess",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Local cookie manager: view, edit, import and export cookies of the current site.",
+    "description": "Extension description in the store and chrome://extensions"
+  },
+  "commandOpen": {
+    "message": "Open Cookiess",
+    "description": "Keyboard shortcut description"
+  }
+}

@@ -1,4 +1,5 @@
 import { validateCookie, type Cookie } from './domain';
+import { t } from './i18n';
 export type Format = 'cookiess' | 'cookie-editor' | 'netscape';
 export interface ParseResult {
   cookies: Cookie[];
@@ -22,9 +23,9 @@ const known = new Set([
 ]);
 function record(input: unknown, index: number, result: ParseResult, legacy = false): void {
   const fail = (reason: string): void => {
-    result.errors.push(`Запись ${index}: ${reason}`);
+    result.errors.push(t('fRecord', { n: index, reason }));
   };
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail('ожидается объект.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail(t('fObject'));
   const data = { ...(input as Record<string, unknown>) };
   // Cookie-Editor JsonFormat exports null storeId and null for unspecified SameSite.
   // These adaptations belong only to the detected legacy array, never Cookiess v1.
@@ -36,19 +37,17 @@ function record(input: unknown, index: number, result: ParseResult, legacy = fal
     data.sameSite = value === 'none' ? 'no_restriction' : value;
   }
   for (const field of ['name', 'value', 'domain', 'path'])
-    if (typeof data[field] !== 'string') return fail(`поле ${field} должно быть строкой.`);
+    if (typeof data[field] !== 'string') return fail(t('fString', { field }));
   for (const field of ['hostOnly', 'secure', 'httpOnly', 'session'])
     if (data[field] !== undefined && typeof data[field] !== 'boolean')
-      return fail(`поле ${field} должно быть boolean.`);
+      return fail(t('fBoolean', { field }));
   if (
     data.expirationDate !== undefined &&
     (typeof data.expirationDate !== 'number' || !Number.isFinite(data.expirationDate))
   )
-    return fail('некорректный expirationDate.');
-  if (data.storeId !== undefined && typeof data.storeId !== 'string')
-    return fail('storeId должен быть строкой.');
-  if (data.sameSite !== undefined && typeof data.sameSite !== 'string')
-    return fail('sameSite должен быть строкой.');
+    return fail(t('fExpiry'));
+  if (data.storeId !== undefined && typeof data.storeId !== 'string') return fail(t('fStoreId'));
+  if (data.sameSite !== undefined && typeof data.sameSite !== 'string') return fail(t('fSameSite'));
   if (data.partitionKey !== undefined) {
     const key = data.partitionKey as Record<string, unknown>;
     if (
@@ -59,20 +58,17 @@ function record(input: unknown, index: number, result: ParseResult, legacy = fal
       (key.hasCrossSiteAncestor !== undefined && typeof key.hasCrossSiteAncestor !== 'boolean') ||
       Object.keys(key).some((k) => !['topLevelSite', 'hasCrossSiteAncestor'].includes(k))
     )
-      return fail('неподдерживаемый partitionKey.');
+      return fail(t('fPartition'));
     try {
       const url = new URL(key.topLevelSite);
       if (!['http:', 'https:'].includes(url.protocol) || url.origin !== key.topLevelSite)
-        return fail('topLevelSite должен быть HTTP(S) origin.');
+        return fail(t('fTopLevelHttp'));
     } catch {
-      return fail('некорректный topLevelSite.');
+      return fail(t('fTopLevel'));
     }
   }
   const unknown = Object.keys(data).filter((k) => !known.has(k));
-  if (unknown.length)
-    result.warnings.push(
-      `Запись ${index}: неизвестные поля (${unknown.join(', ')}) не переносятся.`,
-    );
+  if (unknown.length) result.warnings.push(t('fUnknown', { n: index, fields: unknown.join(', ') }));
   const cookie: Cookie = {
     name: data.name as string,
     value: data.value as string,
@@ -93,29 +89,27 @@ function record(input: unknown, index: number, result: ParseResult, legacy = fal
 }
 export function parse(text: string): ParseResult {
   const result: ParseResult = { cookies: [], errors: [], warnings: [] };
-  if (text.length > 10_000_000) return { ...result, errors: ['Файл больше 10 MB.'] };
+  if (text.length > 10_000_000) return { ...result, errors: [t('fileTooLarge')] };
   const trimmed = text.trim();
-  if (!trimmed) return { ...result, errors: ['Вставьте текст или выберите файл.'] };
+  if (!trimmed) return { ...result, errors: [t('fEmpty')] };
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     let data: unknown;
     try {
       data = JSON.parse(trimmed);
     } catch {
-      return { ...result, errors: ['Некорректный JSON.'] };
+      return { ...result, errors: [t('fJson')] };
     }
     let entries: unknown[];
     if (Array.isArray(data)) entries = data;
     else {
       const root = data as Record<string, unknown>;
       if (!root || root.format !== 'cookiess' || root.version !== 1 || !Array.isArray(root.cookies))
-        return { ...result, errors: ['Ожидается Cookiess version 1 или массив Cookie-Editor.'] };
+        return { ...result, errors: [t('fRoot')] };
       entries = root.cookies;
     }
     entries.forEach((entry, i) => record(entry, i + 1, result, Array.isArray(data)));
   } else {
-    result.warnings.push(
-      'cookies.txt не хранит SameSite, partitionKey и store. SameSite: unspecified; store: текущей вкладки.',
-    );
+    result.warnings.push(t('fTxtWarning'));
     text.split(/\r?\n/).forEach((line, i) => {
       if (!line || (line.startsWith('#') && !line.startsWith('#HttpOnly_'))) return;
       const parts = line.split('\t');
@@ -125,7 +119,7 @@ export function parse(text: string): ParseResult {
         !['TRUE', 'FALSE'].includes(parts[3]) ||
         !/^\d+$/.test(parts[4])
       ) {
-        result.errors.push(`Строка ${i + 1}: ожидаются 7 tab-полей, TRUE/FALSE и целый срок.`);
+        result.errors.push(t('fTxtLine', { n: i + 1 }));
         return;
       }
       const [domain, subdomains, path, secure, expiration, name, value] = parts;
@@ -162,19 +156,11 @@ export function serialize(cookies: Cookie[], format: Format): { text: string; wa
         null,
         2,
       ),
-      warnings:
-        format === 'cookie-editor'
-          ? [
-              'Cookie-Editor JSON: storeId не переносится; Unspecified SameSite обозначается null. Для полного архива используйте Cookiess JSON.',
-            ]
-          : [],
+      warnings: format === 'cookie-editor' ? [t('fCookieEditor')] : [],
     };
-  if (cookies.some((c) => c.partitionKey))
-    throw new Error(
-      'cookies.txt не поддерживает partitioned cookies. Выберите JSON или только непартиционированные записи.',
-    );
+  if (cookies.some((c) => c.partitionKey)) throw new Error(t('fTxtPartition'));
   if (cookies.some((c) => [c.domain, c.path, c.name, c.value].some((s) => /[\t\r\n]/.test(s))))
-    throw new Error('Tab и переводы строк нельзя сохранить в cookies.txt. Выберите JSON.');
+    throw new Error(t('fTxtTabs'));
   return {
     text:
       '# Netscape HTTP Cookie File\n' +
@@ -192,6 +178,6 @@ export function serialize(cookies: Cookie[], format: Format): { text: string; wa
         )
         .join('\n') +
       '\n',
-    warnings: ['Потери cookies.txt: SameSite, store и partitionKey.'],
+    warnings: [t('fTxtLoss')],
   };
 }

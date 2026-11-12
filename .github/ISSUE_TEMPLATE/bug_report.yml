@@ -1,0 +1,38 @@
+name: Ошибка / Bug report
+description: Что-то работает не так, как описано в README
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Не прикладывайте настоящие cookies, экспорт сессий или скриншоты с реальными значениями.** Используйте синтетические данные.
+        Уязвимости сообщайте приватно — см. SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Версия Cookiess (chrome://extensions)
+      placeholder: 1.1.0.57
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Браузер, версия и ОС
+      placeholder: Chrome 140, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыть https://example.com
+        2. Нажать «Добавить»…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидалось и получилось
+    validations:
+      required: true

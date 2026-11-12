@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Сообщить об уязвимости / Report a vulnerability
+    url: https://github.com/smallp80380/cookiess/security/advisories/new
+    about: Приватно, без публичного issue.

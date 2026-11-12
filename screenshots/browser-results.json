@@ -1,6 +1,6 @@
 {
-  "browser": "154.0.8037.92",
-  "extensionId": "nfnhmhhiacgdglnkkknhponepnbbmang",
+  "browser": "156.0.8078.79",
+  "extensionId": "fjdhkijilmhbhkcgklaciabeaelbhnkf",
   "tests": [
     "manifest resources load; unsupported controller state; native popup has no-access state",
     "native permission denial is distinct from empty cookies",
@@ -12,6 +12,7 @@
     "Add validates fields, creates persistent None Secure and Cancel protects dirty draft",
     "ambiguous duplicate deletion refuses mutation; selected deletion excludes unselected cookies",
     "identity rename creates new row and removes old row",
+    "flag filter, expiry editor with 400-day cap, row removal and undo restore the record",
     "hostOnly/domain same domain path name coexist; JSON import keeps both identities",
     "partitioned editor saves full key and leaves other partitions untouched",
     "JSON export all ignores search; native file download and clipboard/manual fallback",

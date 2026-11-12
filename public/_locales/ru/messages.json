@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Cookiess",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Локальный менеджер cookies: просмотр, редактирование, импорт и экспорт текущего сайта.",
+    "description": "Extension description in the store and chrome://extensions"
+  },
+  "commandOpen": {
+    "message": "Открыть Cookiess",
+    "description": "Keyboard shortcut description"
+  }
+}

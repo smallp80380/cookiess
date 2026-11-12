@@ -13,8 +13,11 @@ const context = await chromium.launchPersistentContext(profile, {
   executablePath: process.env.CHROMIUM_PATH ?? chromium.executablePath(),
   headless: false,
   ignoreDefaultArgs: ['--disable-extensions'],
+  // Assertions read the Russian UI; pin the browser language so "Язык браузера" resolves to ru.
+  env: { ...process.env, LANGUAGE: 'ru', LANG: 'ru_RU.UTF-8' },
   args: [
     '--no-sandbox',
+    '--lang=ru',
     '--enable-unsafe-extension-debugging',
     `--load-extension=${extensionRoot}`,
     // Native dialogs are driven by xdotool on the Xvfb display. Without this, a desktop
@@ -42,7 +45,8 @@ cdp.on('Target.receivedMessageFromTarget', (event) => {
   if (entry) {
     pending.delete(data.id);
     clearTimeout(entry.timer);
-    data.error ? entry.reject(new Error(JSON.stringify(data.error))) : entry.resolve(data.result);
+    if (data.error) entry.reject(new Error(JSON.stringify(data.error)));
+    else entry.resolve(data.result);
   }
 });
 async function attach(targetId) {
@@ -101,7 +105,10 @@ async function input(selector, value) {
   );
 }
 async function back() {
-  assert.equal(await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').textContent.trim()'), 'Назад');
+  assert.equal(
+    await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').textContent.trim()'),
+    'Назад',
+  );
   await clickText('Назад');
   await idle();
 }
@@ -137,7 +144,10 @@ async function openPopup(opener) {
   popupSend = await attach(popup.targetId);
   await popupSend('Runtime.enable');
   await popupSend('Page.enable');
-  await waitFor("document.querySelector('.content')?.textContent && !document.querySelector('.content').textContent.includes('Определяем контекст активной вкладки')", 'popup initialization');
+  await waitFor(
+    "document.querySelector('.content')?.textContent && !document.querySelector('.content').textContent.includes('Определяем контекст активной вкладки')",
+    'popup initialization',
+  );
   await idle();
 }
 async function popupAlive() {
@@ -164,9 +174,6 @@ const nativeClick = (x, y) => {
   const r = spawnSync('xdotool', ['mousemove', String(x), String(y), 'click', '1']);
   assert.equal(r.status, 0);
 };
-async function grant() {
-  await clickText('Разрешить доступ');
-}
 // Permission dialogs block run(), so invoke without awaiting idle until native consent.
 async function permissionClick() {
   await evaluate(
@@ -242,36 +249,63 @@ try {
       assert.match(await evaluate('document.body.innerText'), /Здесь пока нет cookies/);
     },
   );
-  await check('Back sits opposite Refresh above host; refresh preserves every action and dirty draft', async () => {
-    for (const action of ['Export', 'Import', 'Add', 'Remove']) {
-      await clickText(action);
-      await evaluate('document.querySelector(".form")?.scrollTo(0, 100000)');
-      assert(await evaluate(`(()=>{const b=document.querySelector('[aria-label="Назад к списку"]');const r=b.getBoundingClientRect();return b.textContent.trim()==='Назад'&&r.top>=0&&r.bottom<=innerHeight;})()`));
-      assert(await evaluate(`(()=>{const b=document.querySelector('[aria-label="Назад к списку"]').getBoundingClientRect();const r=document.querySelector('[aria-label="Обновить сайт и cookies"]').getBoundingClientRect();const h=document.querySelector('.site h1').getBoundingClientRect();return Math.abs((b.top+b.bottom)/2-(r.top+r.bottom)/2)<2&&b.right<r.left&&b.bottom<h.top;})()`));
-      const heading = await evaluate('document.querySelector(".panel-title h2").textContent');
-      await evaluate('document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()');
-      await idle();
-      assert.equal(await evaluate('document.querySelector(".panel-title h2").textContent'), heading);
-      assert.equal(await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').disabled'), false);
-      if (action === 'Export') await shot('export-back');
-      if (action === 'Add') {
-        await input('#field-name', 'unsaved-synthetic');
-        await evaluate('document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()');
+  await check(
+    'Back sits opposite Refresh above host; refresh preserves every action and dirty draft',
+    async () => {
+      for (const action of ['Экспорт', 'Импорт', 'Добавить', 'Удалить']) {
+        await clickText(action);
+        await evaluate('document.querySelector(".form")?.scrollTo(0, 100000)');
+        assert(
+          await evaluate(
+            `(()=>{const b=document.querySelector('[aria-label="Назад к списку"]');const r=b.getBoundingClientRect();return b.textContent.trim()==='Назад'&&r.top>=0&&r.bottom<=innerHeight;})()`,
+          ),
+        );
+        assert(
+          await evaluate(
+            `(()=>{const b=document.querySelector('[aria-label="Назад к списку"]').getBoundingClientRect();const r=document.querySelector('[aria-label="Обновить сайт и cookies"]').getBoundingClientRect();const h=document.querySelector('.site h1').getBoundingClientRect();return Math.abs((b.top+b.bottom)/2-(r.top+r.bottom)/2)<2&&b.right<r.left&&b.bottom<h.top;})()`,
+          ),
+        );
+        const heading = await evaluate('document.querySelector(".panel-title h2").textContent');
+        await evaluate(
+          'document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()',
+        );
         await idle();
-        assert.equal(await evaluate('document.querySelector("#field-name").value'), 'unsaved-synthetic');
-        await shot('editor-navigation');
-        acceptDialogs = false;
-        try {
-          await back();
-          assert.equal(await evaluate('document.querySelector("#field-name").value'), 'unsaved-synthetic');
-        } finally {
-          acceptDialogs = true;
+        assert.equal(
+          await evaluate('document.querySelector(".panel-title h2").textContent'),
+          heading,
+        );
+        assert.equal(
+          await evaluate('document.querySelector(\'[aria-label="Назад к списку"]\').disabled'),
+          false,
+        );
+        if (action === 'Экспорт') await shot('export-back');
+        if (action === 'Добавить') {
+          await input('#field-name', 'unsaved-synthetic');
+          await evaluate(
+            'document.querySelector(\'[aria-label="Обновить сайт и cookies"]\').click()',
+          );
+          await idle();
+          assert.equal(
+            await evaluate('document.querySelector("#field-name").value'),
+            'unsaved-synthetic',
+          );
+          await shot('editor-navigation');
+          acceptDialogs = false;
+          try {
+            await back();
+            assert.equal(
+              await evaluate('document.querySelector("#field-name").value'),
+              'unsaved-synthetic',
+            );
+          } finally {
+            acceptDialogs = true;
+          }
         }
+        await back();
+        assert(await evaluate('Boolean(document.querySelector(".search"))'));
       }
-      await back();
-      assert(await evaluate('Boolean(document.querySelector(".search"))'));
-    }
-  });
+    },
+  );
   const base = {
     url: 'https://app.example.com/',
     secure: true,
@@ -373,7 +407,7 @@ try {
         'unspecified',
       );
       await input('#field-value', 'synthetic-edited');
-      await clickText('Save');
+      await clickText('Сохранить');
       const saved = (await readCookies()).find((c) => c.name === 'host-root');
       assert.equal(saved.value, 'synthetic-edited');
       assert(saved.session && saved.httpOnly);
@@ -383,23 +417,23 @@ try {
   await check(
     'Add validates fields, creates persistent None Secure and Cancel protects dirty draft',
     async () => {
-      await clickText('Add');
+      await clickText('Добавить');
       await input('#field-name', 'created');
       await input('#field-value', 'synthetic-new');
       await input('#field-path', 'invalid');
-      await clickText('Save');
+      await clickText('Сохранить');
       assert.match(await evaluate('document.body.innerText'), /Путь начинается/);
       await input('#field-path', '/');
       await evaluate("document.querySelector('#field-session').click()");
       await input('#field-expirationDate', String(Math.floor(Date.now() / 1000) + 3600));
       await input('#field-sameSite', 'no_restriction');
-      await clickText('Save');
+      await clickText('Сохранить');
       const created = (await readCookies()).find((c) => c.name === 'created');
       assert(created && !created.session && created.secure);
       assert.equal(created.sameSite, 'no_restriction');
-      await clickText('Add');
+      await clickText('Добавить');
       await input('#field-name', 'draft');
-      await clickText('Cancel');
+      await clickText('Отмена');
       assert(!(await readCookies()).some((c) => c.name === 'draft'));
     },
   );
@@ -418,7 +452,7 @@ try {
         before.length,
       );
       await evaluate('document.querySelector(\'[aria-label="Выбрать duplicate /"]\').click()');
-      await clickText('Remove');
+      await clickText('Удалить');
       await clickText('Удалить выбранные (1)');
       assert.deepEqual(
         (await readCookies()).filter((c) => c.name === 'duplicate').map((c) => c.path),
@@ -430,7 +464,7 @@ try {
       await delay(100);
       await idle();
       assert(!(await readCookies()).some((c) => c.name === 'duplicate'));
-      await clickText('Remove');
+      await clickText('Удалить');
       assert(
         await evaluate(
           "[...document.querySelectorAll('button')].find(b=>b.textContent==='Удалить выбранные (0)').disabled",
@@ -442,15 +476,53 @@ try {
   await check('identity rename creates new row and removes old row', async () => {
     await evaluate('document.querySelector(\'[aria-label="Редактировать host-root /"]\').click()');
     await input('#field-name', 'renamed');
-    await clickText('Save');
+    await clickText('Сохранить');
     const all = await readCookies();
     assert(all.some((c) => c.name === 'renamed'));
     assert(!all.some((c) => c.name === 'host-root'));
   });
   await check(
+    'flag filter, expiry editor with 400-day cap, row removal and undo restore the record',
+    async () => {
+      const filter = '[aria-label="Фильтр по флагам"]';
+      await input(filter, 'persistent');
+      // Every visible row is persistent (has an expiry, no session flag), and some were hidden.
+      assert(
+        await evaluate(
+          "(()=>{const rows=[...document.querySelectorAll('.cookie-row')];return rows.length>0&&rows.every(r=>r.querySelector('.cookie-expiry')&&![...r.querySelectorAll('.flag')].some(f=>f.textContent==='session'))})()",
+        ),
+      );
+      assert.match(await evaluate('document.body.innerText'), /(\d+) из (?!\1\b)\d+ cookies/);
+      assert.match(await evaluate("document.querySelector('.cookie-expiry').textContent"), /через/);
+      await evaluate(
+        'document.querySelector(\'[aria-label="Редактировать persistent /"]\').click()',
+      );
+      const local = await evaluate("document.querySelector('#field-expirationLocal').value");
+      assert.match(local, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+      await input('#field-expirationDate', String(Math.floor(Date.now() / 1000) + 600 * 86400));
+      assert.match(await evaluate('document.body.innerText'), /Больше 400 дней/);
+      await evaluate("document.querySelector('.expiry-note').scrollIntoView({block:'center'})");
+      await shot('editor-expiry');
+      await clickText('Сохранить');
+      assert.match(await evaluate('document.body.innerText'), /сроком 400 дней/);
+      const saved = (await readCookies()).find((c) => c.name === 'persistent');
+      assert(saved.expirationDate - Date.now() / 1000 < 401 * 86400);
+      await evaluate('document.querySelector(\'[aria-label="Удалить persistent /"]\').click()');
+      await delay(100);
+      await idle();
+      assert(!(await readCookies()).some((c) => c.name === 'persistent'));
+      await clickText('Отменить');
+      const restored = (await readCookies()).find((c) => c.name === 'persistent');
+      assert(restored, 'undo restored the removed cookie');
+      assert.equal(restored.value, saved.value);
+      assert.equal(restored.sameSite, saved.sameSite);
+      await input(filter, 'all');
+    },
+  );
+  await check(
     'hostOnly/domain same domain path name coexist; JSON import keeps both identities',
     async () => {
-      await clickText('Import');
+      await clickText('Импорт');
       const records = [
         {
           name: 'coexisting',
@@ -497,7 +569,7 @@ try {
         'document.querySelector(\'[aria-label="Редактировать partition-current /"]\').click()',
       );
       await input('#field-value', 'synthetic-partition-edited');
-      await clickText('Save');
+      await clickText('Сохранить');
       const all = await readCookies();
       const saved = all.find((c) => c.name === 'partition-current');
       assert.equal(saved.value, 'synthetic-partition-edited');
@@ -512,7 +584,7 @@ try {
     'JSON export all ignores search; native file download and clipboard/manual fallback',
     async () => {
       await input('.search', 'renamed');
-      await clickText('Export');
+      await clickText('Экспорт');
       const json = JSON.parse(await evaluate("document.querySelector('.export-text').value"));
       assert(json.cookies.length > 1);
       assert.equal(json.format, 'cookiess');
@@ -544,7 +616,7 @@ try {
   await check(
     'import preview, foreign-domain rejection, malformed record and actual partial results',
     async () => {
-      await clickText('Import');
+      await clickText('Импорт');
       const imported = {
         name: 'imported',
         value: 'synthetic-import',
@@ -602,7 +674,7 @@ try {
     },
   );
   await check('Netscape paste and JSON local file import', async () => {
-    await clickText('Import');
+    await clickText('Импорт');
     await input(
       '.import-text',
       '#HttpOnly_app.example.com\tFALSE\t/account\tTRUE\t0\tnetscape\tsynthetic-txt\n',
@@ -615,7 +687,7 @@ try {
       ),
     );
     await back();
-    await clickText('Import');
+    await clickText('Импорт');
     const fileJson = JSON.stringify({
       format: 'cookiess',
       version: 1,
@@ -669,7 +741,7 @@ try {
       await input('.theme', 'light');
       await shot('many-light');
       assert.equal(await evaluate('document.documentElement.scrollWidth'), 460);
-      await clickText('Import');
+      await clickText('Импорт');
       await input('.import-text', 'not a cookie file');
       await clickText('Предпросмотр');
       await shot('import-light');
@@ -694,7 +766,7 @@ try {
   await check(
     'Remove all requires host/count confirmation and affects only current host',
     async () => {
-      await clickText('Remove');
+      await clickText('Удалить');
       await clickText('Удалить все cookies этого сайта (2)');
       assert(!(await readCookies()).some((c) => c.name === 'sibling'));
       assert((await readCookies()).some((c) => c.name === 'renamed'));
@@ -707,11 +779,11 @@ try {
       await openPopup();
       assert.match(await evaluate('document.body.innerText'), /Доступ к сайту/);
       await approvePermission();
-      await clickText('Add');
+      await clickText('Добавить');
       await input('#field-name', `synthetic-${host}`);
       await input('#field-value', 'synthetic-local');
       assert.equal(await evaluate("document.querySelector('#field-secure').checked"), false);
-      await clickText('Save');
+      await clickText('Сохранить');
       assert.match(await evaluate('document.body.innerText'), /1 из 1 cookies/);
     }
   });
@@ -769,10 +841,10 @@ try {
           '(async()=>{const tab=(await chrome.tabs.query({active:true,currentWindow:true}))[0];return (await chrome.cookies.getAllCookieStores()).find(s=>s.tabIds.includes(tab.id));})()',
         );
         assert.notEqual(stores.id, '0');
-        await clickText('Add');
+        await clickText('Добавить');
         await input('#field-name', 'synthetic-incognito');
         await input('#field-value', 'synthetic-private-store');
-        await clickText('Save');
+        await clickText('Сохранить');
         assert.match(await evaluate('document.body.innerText'), /1 из 1 cookies/);
         const privateCookies = await evaluate(
           `chrome.cookies.getAll({storeId:${JSON.stringify(stores.id)}})`,
@@ -780,7 +852,7 @@ try {
         assert.equal(privateCookies.length, 1);
         assert.equal(privateCookies[0].storeId, stores.id);
         assert(!(await readCookies()).some((c) => c.name === 'synthetic-incognito'));
-        await clickText('Remove');
+        await clickText('Удалить');
         await clickText('Удалить все cookies этого сайта (1)');
         assert((await readCookies()).some((c) => c.name === 'renamed'));
         await shot('incognito-empty');

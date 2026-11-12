@@ -102,3 +102,19 @@ The portable smoke and all 21 install-ZIP checks were executed locally in Linux 
 Back and Refresh now share a persistent row above the site hostname. Back remains visible on the list (disabled when there is no internal destination) and active on action screens. Refresh on the same tab/origin/store/partition rereads cookies and retains the action and dirty editor/import text; export refreshes its output and import invalidates the old preview. A changed context still requires dirty-draft confirmation before resetting and preserves mutation guards.
 
 Typecheck, lint, 20 unit tests, build/ZIP checks and all 21 real native-popup tests passed locally against the extracted 1.0.2 install ZIP. The navigation regression asserts alignment above the hostname, retained action and enabled Back after Refresh, retained dirty Add draft, and cancelled/confirmed Back. Screenshot: [editor-navigation.png](screenshots/editor-navigation.png). CI adds the same Linux full suite and a Windows native-popup smoke as publication gates.
+
+## Roadmap release — 1.1.0 (2026-11-13)
+
+Changes: English UI and `_locales`, Russian button labels, expiry display/date-time editor with pre-write 400-day cap, value search and flag filter, per-row copy, URL/Base64/JWT decoding, duplicate, undo of the last removal and optional pre-removal backup, import progress/stop with per-record reasons, targeted per-record lookups during import, detection of navigation to sites without access, `Alt+Shift+K` shortcut. See [CHANGELOG.md](CHANGELOG.md) and [ROADMAP.md](ROADMAP.md).
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck`, `npm run lint` (now including `scripts/`), `npm run format:check` | Passed |
+| `npm run test:coverage` | 46 tests in 5 files passed; statements ≈90%, branches ≈84% (thresholds 85/80) |
+| `npm run package` + `scripts/verify-package.py` (now also checks `_locales` consistency) | Passed |
+| `npm audit` | 0 vulnerabilities (vite/vitest updated; minimatch override for typescript-eslint) |
+| Native-popup suite (`--lang=ru`) | **22 checks passed** on Linux arm64, Chromium 156.0.8078.79, Playwright 1.63.0, Xvfb. New check: flag filter, expiry editor with 400-day cap, row removal and undo |
+
+The unchanged 1.0.2 suite was also re-run on the same machine before these changes (21/21 passed) to separate environment effects from regressions. Screenshots in `screenshots/` and store compositions in `store/assets/` were regenerated from this run; `editor-expiry.png` is new.
+
+Not verified by this run: Windows smoke and macOS (CI only), screen reader, English UI in the native suite (unit-tested strings only), real clipboard success (manual fallback path as before).

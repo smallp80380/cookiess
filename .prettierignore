@@ -1,0 +1,12 @@
+node_modules/
+dist/
+artifacts/
+test-output/
+package-lock.json
+screenshots/
+store/assets/
+public/THIRD_PARTY_NOTICES.txt
+public/LICENSE.txt
+docs/
+# Prose documents keep their hand-written layout.
+*.md

@@ -1,7 +1,7 @@
 # Chrome Web Store listing — Russian
 
 Name: Cookiess
-Version: 1.0.2
+Version: 1.1.0
 Language: Russian (ru)
 Proposed category: Developer Tools (confirm the available dashboard category before submission).
 
@@ -13,12 +13,14 @@ Proposed category: Developer Tools (confirm the available dashboard category bef
 
 Cookiess помогает управлять cookies текущего сайта прямо из панели Chrome.
 
-• Просматривайте cookies на разных путях, ищите по имени, домену и пути.
-• Редактируйте значения и атрибуты, создавайте новые записи.
-• Удаляйте выбранные cookies или явно подтверждайте удаление всех записей сайта.
+• Просматривайте cookies на разных путях, ищите по имени, значению, домену и пути, фильтруйте по флагам.
+• Видите срок действия каждой записи и задавайте его датой и временем.
+• Редактируйте значения и атрибуты, создавайте и дублируйте записи, копируйте значение одним нажатием.
+• Смотрите декодированное значение: URL, Base64 и JWT.
+• Удаляйте выбранные cookies или явно подтверждайте удаление всех записей сайта; последнее удаление можно отменить.
 • Импортируйте JSON Cookiess, JSON Cookie-Editor и Netscape cookies.txt с предпросмотром изменений.
 • Экспортируйте все записи сайта или выбранные cookies в файл либо буфер обмена.
-• Используйте светлую, тёмную или системную тему.
+• Используйте светлую, тёмную или системную тему, русский или английский интерфейс, горячую клавишу Alt+Shift+K.
 
 Обработка выполняется на вашем устройстве. Нет сервера, аналитики, рекламы или отправки cookies разработчику. Доступ к выбранным сайтам выдаётся вами через запрос Chrome. Incognito доступ включается отдельно в настройках расширения; обычные и приватные cookies не смешиваются.
 
@@ -32,7 +34,7 @@ Project: https://github.com/smallp80380/cookiess
 
 ## Uploads
 
-Package: release `v1.0.2`, `cookiess-1.0.2.zip`.
+Package: the latest `v1.1.0.N` release, `cookiess-1.1.0.N.zip`.
 Screenshots, in order: `assets/01-list.png`, `02-editor.png`, `03-import.png`, `04-dark.png` (1280×800).
 Small promotional tile: `assets/promo-440x280.png` (440×280).
 Icon: `../public/icons/128.png` (128×128).

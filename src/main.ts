@@ -1,7 +1,38 @@
 import './style.css';
 import { CookieApi, applyImport, previewImport, type ImportItem } from './api';
-import { accessPattern, identity, partitionIdentity, validateCookie, type Cookie, type SiteContext } from './domain';
+import { decodeValue } from './decode';
+import {
+  accessPattern,
+  clampLifetime,
+  identity,
+  partitionIdentity,
+  validateCookie,
+  type Cookie,
+  type SiteContext,
+} from './domain';
 import { parse, serialize, type Format } from './formats';
+import { applyDocumentLanguage, setLanguage, t, type LanguagePreference } from './i18n';
+import {
+  expiryLabel,
+  formatDate,
+  formatRelative,
+  fromLocalInput,
+  toLocalInput,
+  visibleCookies,
+  type FlagFilter,
+  type SortKey,
+} from './view';
+
+// Language and theme are read before the first render so the popup never flashes the
+// wrong language. Storage failures fall back to the browser language and system theme.
+const preferences = await chrome.storage.local
+  .get(['theme', 'lang'])
+  .catch(() => ({}) as Record<string, unknown>);
+const languagePreference: LanguagePreference =
+  preferences.lang === 'ru' || preferences.lang === 'en' ? preferences.lang : 'auto';
+setLanguage(languagePreference);
+applyDocumentLanguage();
+
 const api = new CookieApi();
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const icons: Record<string, string> = {
@@ -14,6 +45,7 @@ const icons: Record<string, string> = {
   refresh: '<path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 7M4 12l2 7a7 7 0 0 0 12-2"/>',
   back: '<path d="m14 5-7 7 7 7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
 };
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -43,6 +75,18 @@ function button(
   b.onclick = () => void run(action);
   return b;
 }
+function select(label: string, options: [string, string][], value: string): HTMLSelectElement {
+  const s = el('select');
+  s.setAttribute('aria-label', label);
+  for (const [v, text] of options) {
+    const o = el('option', '', text);
+    o.value = v;
+    s.append(o);
+  }
+  s.value = value;
+  return s;
+}
+const unnamed = (cookie: Cookie): string => cookie.name || t('unnamed');
 let context: SiteContext | undefined;
 let cookies: Cookie[] = [];
 let selected = new Set<string>();
@@ -50,40 +94,61 @@ let screen: 'list' | 'editor' | 'import' | 'export' | 'remove' = 'list';
 let dirty = false;
 let busy = false;
 let query = '';
-let sort = 'name';
+let sort: SortKey = 'name';
+let flag: FlagFilter = 'all';
 let allowed = false;
 let ready = false;
 let loadVersion = 0;
 let refreshPanel: (() => void) | undefined;
+// The last deletion stays in popup memory only, so it can be undone until the popup closes.
+let lastDeleted: Cookie[] = [];
 const brand = el('header', 'brand');
 const logo = el('div', 'wordmark');
 logo.append(icon('cookie'), el('strong', '', 'Cookiess'), el('span', 'edition', 'LOCAL'));
-const theme = el('select', 'theme');
-theme.setAttribute('aria-label', 'Тема');
-for (const [value, label] of [
-  ['system', 'Системная'],
-  ['light', 'Светлая'],
-  ['dark', 'Тёмная'],
-]) {
-  const option = el('option', '', label);
-  option.value = value;
-  theme.append(option);
-}
+const theme = select(
+  t('theme'),
+  [
+    ['system', t('themeSystem')],
+    ['light', t('themeLight')],
+    ['dark', t('themeDark')],
+  ],
+  preferences.theme === 'light' || preferences.theme === 'dark' ? preferences.theme : 'system',
+);
+theme.className = 'theme';
 function setTheme(value: string) {
   document.documentElement.dataset.theme = value;
 }
+setTheme(theme.value);
 theme.onchange = () => {
   setTheme(theme.value);
-  void chrome.storage.local.set({ theme: theme.value });
+  void chrome.storage.local.set({ theme: theme.value }).catch(() => undefined);
 };
-void chrome.storage.local.get('theme').then((data) => {
-  theme.value = data.theme === 'light' || data.theme === 'dark' ? data.theme : 'system';
-  setTheme(theme.value);
-});
-brand.append(logo, theme);
+const language = select(
+  t('language'),
+  [
+    ['auto', t('languageAuto')],
+    ['ru', 'Русский'],
+    ['en', 'English'],
+  ],
+  languagePreference,
+);
+language.className = 'language';
+language.onchange = () => {
+  if (!leave()) {
+    language.value = languagePreference;
+    return;
+  }
+  void chrome.storage.local
+    .set({ lang: language.value })
+    .catch(() => undefined)
+    .then(() => location.reload());
+};
+const brandControls = el('div', 'brand-controls');
+brandControls.append(language, theme);
+brand.append(logo, brandControls);
 const site = el('section', 'site');
-const host = el('h1', '', 'Текущий сайт');
-const contextLabel = el('p', 'muted', 'Все пути · только контекст вкладки');
+const host = el('h1', '', t('currentSite'));
+const contextLabel = el('p', 'muted', t('contextDefault'));
 const siteText = el('div', 'site-text');
 siteText.append(host, contextLabel);
 const refresh = button(
@@ -94,14 +159,19 @@ const refresh = button(
   'icon-button',
   'refresh',
 );
-refresh.setAttribute('aria-label', 'Обновить сайт и cookies');
-const back = button('Назад', async () => {
-  if (!leave()) return;
-  notify('');
-  if (!ready || !allowed) await initialize();
-  else renderList();
-}, 'back-button', 'back');
-back.setAttribute('aria-label', 'Назад к списку');
+refresh.setAttribute('aria-label', t('refreshLabel'));
+const back = button(
+  t('back'),
+  async () => {
+    if (!leave()) return;
+    notify('');
+    if (!ready || !allowed) await initialize();
+    else renderList();
+  },
+  'back-button',
+  'back',
+);
+back.setAttribute('aria-label', t('backLabel'));
 const navigation = el('div', 'site-navigation');
 navigation.append(back, refresh);
 site.append(navigation, siteText);
@@ -111,17 +181,39 @@ status.setAttribute('aria-live', 'polite');
 const content = el('main', 'content');
 const footer = el('footer', 'actions');
 const actionButtons = [
-  button('Import', () => openImport(), '', 'import'),
-  button('Export', () => openExport(), '', 'export'),
-  button('Add', () => openEditor(), 'primary', 'add'),
-  button('Remove', () => openRemove(), 'danger', 'remove'),
+  button(t('import'), () => openImport(), '', 'import'),
+  button(t('export'), () => openExport(), '', 'export'),
+  button(t('add'), () => openEditor(), 'primary', 'add'),
+  button(t('remove'), () => openRemove(), 'danger', 'remove'),
 ];
 footer.append(...actionButtons);
 app.append(brand, site, status, content, footer);
-function notify(message: string, kind = 'info') {
-  status.textContent = message;
+function notify(
+  message: string,
+  kind = 'info',
+  action?: { label: string; run: () => void | Promise<void> },
+) {
+  status.replaceChildren();
   status.dataset.kind = kind;
   status.hidden = !message;
+  if (!message) return;
+  status.append(el('span', '', message));
+  if (action) status.append(button(action.label, action.run, 'status-action'));
+}
+function notifyList(
+  summary: string,
+  details: string[],
+  kind: string,
+  action?: { label: string; run: () => void | Promise<void> },
+  limit = 3,
+) {
+  const shown = details.slice(0, limit);
+  const more = details.length - shown.length;
+  notify(
+    [summary, ...shown, ...(more > 0 ? [t('andMore', { n: more })] : [])].join('\n'),
+    kind,
+    action,
+  );
 }
 function lock(value: boolean) {
   busy = value;
@@ -136,18 +228,13 @@ async function run(action: () => void | Promise<void>) {
   try {
     await action();
   } catch (error) {
-    notify(
-      error instanceof Error
-        ? error.message
-        : 'Операция не выполнена. Обновите список и проверьте доступ.',
-      'error',
-    );
+    notify(error instanceof Error ? error.message : t('operationFailed'), 'error');
   } finally {
     lock(false);
   }
 }
 function leave(): boolean {
-  if (dirty && !confirm('Есть несохранённые изменения. Закрыть форму?')) return false;
+  if (dirty && !confirm(t('confirmLeave'))) return false;
   dirty = false;
   return true;
 }
@@ -164,30 +251,33 @@ async function initialize() {
   allowed = false;
   context = undefined;
   cookies = [];
+  lastDeleted = [];
   selected.clear();
   screen = 'list';
   notify('');
-  state('Загрузка', 'Определяем контекст активной вкладки…');
+  state(t('loadingTitle'), t('loadingText'));
   try {
     const next = await api.context();
     if (version !== loadVersion) return;
     context = next;
     host.textContent = context.host;
     host.title = context.host;
-    contextLabel.textContent = `Все пути · store ${context.storeId} · текущая partition`;
+    contextLabel.textContent = t('contextLabel', { store: context.storeId });
     allowed = await api.hasAccess(context);
     if (!allowed) {
       state(
-        'Доступ к сайту',
-        `Для чтения и изменения cookies разрешите доступ к ${accessPattern(context.host).replace('*://', '').replace('/*', '')}. Родительские domain cookies включены; список ограничен текущим хостом.`,
+        t('accessTitle'),
+        t('accessText', {
+          pattern: accessPattern(context.host).replace('*://', '').replace('/*', ''),
+        }),
         button(
-          'Разрешить доступ',
+          t('grantAccess'),
           async () => {
             if (!context) return;
             // request must start in the click's user gesture, before any awaited API call.
             const granted = await api.requestAccess(context);
             if (!granted) {
-              notify('Доступ не предоставлен. Cookies не прочитаны.', 'error');
+              notify(t('accessDenied'), 'error');
               return;
             }
             await initialize();
@@ -202,9 +292,9 @@ async function initialize() {
     renderList();
   } catch (error) {
     state(
-      'Сайт недоступен',
-      error instanceof Error ? error.message : 'Не удалось загрузить cookies.',
-      button('Повторить', initialize),
+      t('siteUnavailable'),
+      error instanceof Error ? error.message : t('loadFailed'),
+      button(t('retry'), initialize),
     );
   } finally {
     lock(false);
@@ -221,9 +311,14 @@ async function reload() {
 }
 async function refreshCurrentView() {
   const next = await api.context();
-  if (context && next.tabId === context.tabId && next.host === context.host &&
-      next.storeId === context.storeId && new URL(next.url).origin === new URL(context.url).origin &&
-      await api.hasAccess(next)) {
+  if (
+    context &&
+    next.tabId === context.tabId &&
+    next.host === context.host &&
+    next.storeId === context.storeId &&
+    new URL(next.url).origin === new URL(context.url).origin &&
+    (await api.hasAccess(next))
+  ) {
     // Keep the current form and its dirty draft when the site context is unchanged.
     const key = next.partitionKey;
     if (partitionIdentity(key) === partitionIdentity(context.partitionKey)) {
@@ -232,7 +327,7 @@ async function refreshCurrentView() {
       ready = true;
       await reload();
       refreshPanel?.();
-      notify('Cookies обновлены. Текущая форма сохранена.', 'success');
+      notify(t('refreshed'), 'success');
       return;
     }
   }
@@ -244,6 +339,57 @@ function backHeader(title: string) {
   bar.append(el('h2', '', title));
   content.append(bar);
 }
+async function copyText(text: string, fallback?: HTMLTextAreaElement) {
+  try {
+    await navigator.clipboard.writeText(text);
+    notify(t('copied'), 'success');
+  } catch {
+    if (!fallback) throw new Error(t('clipboardUnavailable'));
+    fallback.focus();
+    fallback.select();
+    notify(t('clipboardManual'));
+  }
+}
+function download(text: string, format: Format, suffix = '') {
+  const blob = new Blob([text], {
+    type: format === 'netscape' ? 'text/plain' : 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = el('a');
+  link.href = url;
+  link.download = `cookiess-${context!.host.replace(/[^a-zA-Z0-9.-]/g, '_')}${suffix}-${new Date().toISOString().slice(0, 10)}.${format === 'netscape' ? 'txt' : 'json'}`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function restoreDeleted() {
+  if (!context || !lastDeleted.length) return;
+  const items = previewImport(lastDeleted, cookies, context, 'skip');
+  const result = await applyImport(items, context, api, 'skip');
+  const total = lastDeleted.length;
+  lastDeleted = [];
+  await reload();
+  if (screen !== 'list') renderList();
+  const problems = [
+    ...items
+      .filter((i) => i.action === 'skip' && i.reason)
+      .map((i) => `${unnamed(i.cookie)}: ${i.reason}`),
+    ...result.errors,
+  ];
+  notifyList(
+    t('restored', { done: result.success, total }),
+    problems,
+    result.success === total ? 'success' : 'error',
+  );
+}
+function offerUndo(message: string, kind: string, removed: Cookie[], details: string[] = []) {
+  lastDeleted = removed;
+  notifyList(
+    message,
+    details,
+    kind,
+    removed.length ? { label: t('undo'), run: restoreDeleted } : undefined,
+  );
+}
 function renderList() {
   refreshPanel = undefined;
   screen = 'list';
@@ -252,42 +398,46 @@ function renderList() {
   const tools = el('div', 'tools');
   const search = el('input', 'search');
   search.type = 'search';
-  search.placeholder = 'Поиск по имени, домену, пути';
-  search.setAttribute('aria-label', 'Поиск cookies');
+  search.placeholder = t('searchPlaceholder');
+  search.setAttribute('aria-label', t('searchLabel'));
   search.value = query;
-  const order = el('select');
-  order.setAttribute('aria-label', 'Сортировка');
-  for (const [value, label] of [
-    ['name', 'Имя ↑'],
-    ['domain', 'Домен ↑'],
-    ['path', 'Путь ↑'],
-  ]) {
-    const o = el('option', '', label);
-    o.value = value;
-    order.append(o);
-  }
-  order.value = sort;
-  tools.append(search, order);
+  const filter = select(
+    t('filterLabel'),
+    [
+      ['all', t('filterAll')],
+      ['secure', 'Secure'],
+      ['httpOnly', 'HttpOnly'],
+      ['session', t('filterSession')],
+      ['persistent', t('filterPersistent')],
+      ['partitioned', t('filterPartitioned')],
+    ],
+    flag,
+  );
+  const order = select(
+    t('sortLabel'),
+    [
+      ['name', t('sortName')],
+      ['domain', t('sortDomain')],
+      ['path', t('sortPath')],
+      ['expiry', t('sortExpiry')],
+    ],
+    sort,
+  );
+  tools.append(search, filter, order);
   const summary = el('div', 'list-summary');
   const count = el('span');
   const all = el('input');
   all.type = 'checkbox';
-  all.setAttribute('aria-label', 'Выбрать все видимые записи');
+  all.setAttribute('aria-label', t('selectAllVisible'));
   summary.append(all, count);
   const list = el('div', 'cookie-list');
-  list.setAttribute('aria-label', 'Cookies сайта');
+  list.setAttribute('aria-label', t('listLabel'));
   content.append(tools, summary, list);
   function draw() {
-    const needle = query.toLocaleLowerCase();
-    const visible = cookies
-      .filter((c) => [c.name, c.domain, c.path].some((s) => s.toLocaleLowerCase().includes(needle)))
-      .sort(
-        (a, b) =>
-          a[sort as 'name' | 'domain' | 'path'].localeCompare(
-            b[sort as 'name' | 'domain' | 'path'],
-          ) || a.path.localeCompare(b.path),
-      );
-    count.textContent = `${visible.length} из ${cookies.length} cookies${selected.size ? ` · выбрано ${selected.size}` : ''}`;
+    const visible = visibleCookies(cookies, query, sort, flag);
+    count.textContent =
+      t('countSummary', { visible: visible.length, total: cookies.length }) +
+      (selected.size ? t('countSelected', { n: selected.size }) : '');
     all.checked = visible.length > 0 && visible.every((c) => selected.has(identity(c)));
     all.indeterminate = visible.some((c) => selected.has(identity(c))) && !all.checked;
     all.onchange = () => {
@@ -300,63 +450,66 @@ function renderList() {
     if (!visible.length) {
       const empty = el('div', 'empty');
       empty.append(
-        el('h2', '', cookies.length ? 'Ничего не найдено' : 'Здесь пока нет cookies'),
-        el(
-          'p',
-          'muted',
-          cookies.length
-            ? 'Попробуйте другой запрос.'
-            : 'Добавьте запись или импортируйте локальный файл.',
-        ),
+        el('h2', '', cookies.length ? t('nothingFound') : t('noCookiesTitle')),
+        el('p', 'muted', cookies.length ? t('nothingFoundText') : t('noCookiesText')),
       );
       list.append(empty);
     }
     for (const cookie of visible) {
       const row = el('div', 'cookie-row');
+      const label = `${unnamed(cookie)} ${cookie.path}`;
       const checkbox = el('input');
       checkbox.type = 'checkbox';
       checkbox.checked = selected.has(identity(cookie));
-      checkbox.setAttribute('aria-label', `Выбрать ${cookie.name || '(без имени)'} ${cookie.path}`);
+      checkbox.setAttribute('aria-label', t('selectRow', { label }));
       checkbox.onchange = () => {
         if (checkbox.checked) selected.add(identity(cookie));
         else selected.delete(identity(cookie));
         draw();
       };
       const edit = button('', () => openEditor(cookie), 'cookie-details');
-      edit.setAttribute(
-        'aria-label',
-        `Редактировать ${cookie.name || '(без имени)'} ${cookie.path}`,
-      );
+      edit.setAttribute('aria-label', t('editRow', { label }));
       const first = el('div', 'row-first');
-      first.append(el('strong', 'cookie-name', cookie.name || '(без имени)'));
+      first.append(el('strong', 'cookie-name', unnamed(cookie)));
       const flags = el('span', 'flags');
-      for (const flag of [
+      for (const f of [
         cookie.secure ? 'S' : '',
         cookie.httpOnly ? 'H' : '',
         cookie.partitionKey ? 'P' : '',
         cookie.session ? 'session' : '',
       ])
-        if (flag) flags.append(el('small', 'flag', flag));
+        if (f) flags.append(el('small', 'flag', f));
       first.append(flags);
-      const value = el('span', 'cookie-value', cookie.value || '(пустое значение)');
-      const scope = el('span', 'cookie-scope', `${cookie.domain} · ${cookie.path}`);
+      const value = el('span', 'cookie-value', cookie.value || t('emptyValue'));
+      const scope = el('span', 'cookie-scope');
+      scope.append(`${cookie.domain} · ${cookie.path}`);
+      if (!cookie.session && cookie.expirationDate !== undefined) {
+        const expiry = el('span', 'cookie-expiry', ` · ${expiryLabel(cookie)}`);
+        expiry.title = formatDate(cookie.expirationDate);
+        scope.append(expiry);
+      }
       edit.append(first, value, scope);
+      const copy = button('', () => copyText(cookie.value), 'icon-button row-copy', 'copy');
+      copy.setAttribute('aria-label', t('copyRow', { label }));
+      copy.title = t('copyValue');
       const remove = button(
         '',
         async () => {
           if (
-            confirm(`Удалить ${cookie.name || '(без имени)'} (${cookie.domain}${cookie.path})?`)
+            confirm(
+              t('confirmRemoveOne', { name: unnamed(cookie), where: cookie.domain + cookie.path }),
+            )
           ) {
             await api.remove(cookie, context!);
             await reload();
-            notify('Cookie удалена.', 'success');
+            offerUndo(t('removedOne'), 'success', [cookie]);
           }
         },
         'icon-button row-remove',
         'remove',
       );
-      remove.setAttribute('aria-label', `Удалить ${cookie.name || '(без имени)'} ${cookie.path}`);
-      row.append(checkbox, edit, remove);
+      remove.setAttribute('aria-label', t('removeRow', { label }));
+      row.append(checkbox, edit, copy, remove);
       list.append(row);
     }
   }
@@ -364,30 +517,35 @@ function renderList() {
     query = search.value;
     draw();
   };
+  filter.onchange = () => {
+    flag = filter.value as FlagFilter;
+    draw();
+  };
   order.onchange = () => {
-    sort = order.value;
+    sort = order.value as SortKey;
     draw();
   };
   draw();
 }
-function openEditor(original?: Cookie) {
+function openEditor(original?: Cookie, template?: Cookie) {
   if (!context || !leave()) return;
   notify('');
   screen = 'editor';
   content.replaceChildren();
-  backHeader(original ? 'Редактировать cookie' : 'Новая cookie');
-  const initial: Cookie = original ?? {
-    name: '',
-    value: '',
-    domain: context.host,
-    path: '/',
-    hostOnly: true,
-    secure: new URL(context.url).protocol === 'https:',
-    httpOnly: false,
-    sameSite: 'unspecified',
-    session: true,
-    storeId: context.storeId,
-  };
+  backHeader(original ? t('editTitle') : template ? t('duplicateTitle') : t('newTitle'));
+  const initial: Cookie = original ??
+    template ?? {
+      name: '',
+      value: '',
+      domain: context.host,
+      path: '/',
+      hostOnly: true,
+      secure: new URL(context.url).protocol === 'https:',
+      httpOnly: false,
+      sameSite: 'unspecified',
+      session: true,
+      storeId: context.storeId,
+    };
   const form = el('form', 'form');
   const inputs: Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> = {};
   const errors: Record<string, HTMLElement> = {};
@@ -411,13 +569,30 @@ function openEditor(original?: Cookie) {
     form.append(wrapper);
     return input;
   }
-  field('name', 'Имя', 'text', initial.name);
-  field('value', 'Значение', 'textarea', initial.value);
+  field('name', t('fieldName'), 'text', initial.name);
+  const valueInput = field('value', t('fieldValue'), 'textarea', initial.value);
+  const decoded = el('details', 'decode');
+  const decodedSummary = el('summary', '', t('decodeTitle'));
+  const decodedBody = el('div', 'decode-body');
+  decoded.append(decodedSummary, decodedBody);
+  form.append(decoded);
+  function refreshDecoded() {
+    const views = decodeValue(valueInput.value);
+    decoded.hidden = !views.length;
+    decodedBody.replaceChildren(
+      ...views.flatMap((v) => [
+        el('span', 'decode-kind', t(`decode_${v.kind}`)),
+        el('pre', 'decode-text', v.text),
+      ]),
+    );
+  }
+  refreshDecoded();
+  valueInput.addEventListener('input', refreshDecoded);
   const grid = el('div', 'form-grid');
   form.append(grid);
   for (const [key, label] of [
-    ['domain', 'Домен'],
-    ['path', 'Путь'],
+    ['domain', t('fieldDomain')],
+    ['path', t('fieldPath')],
   ]) {
     field(key, label, 'text', initial[key as 'domain' | 'path']);
     grid.append(form.lastElementChild!);
@@ -435,19 +610,17 @@ function openEditor(original?: Cookie) {
   }
   const sameWrapper = el('label', 'field');
   sameWrapper.append(el('span', '', 'SameSite'));
-  const same = el('select');
+  const same = select(
+    'SameSite',
+    [
+      ['unspecified', t('sameSiteUnspecified')],
+      ['lax', 'Lax'],
+      ['strict', 'Strict'],
+      ['no_restriction', 'None'],
+    ],
+    initial.sameSite,
+  );
   same.id = 'field-sameSite';
-  for (const [value, label] of [
-    ['unspecified', 'Unspecified — без атрибута'],
-    ['lax', 'Lax'],
-    ['strict', 'Strict'],
-    ['no_restriction', 'None'],
-  ]) {
-    const option = el('option', '', label);
-    option.value = value;
-    same.append(option);
-  }
-  same.value = initial.sameSite;
   inputs.sameSite = same;
   const sameError = el('small', 'field-error');
   errors.sameSite = sameError;
@@ -455,27 +628,50 @@ function openEditor(original?: Cookie) {
   form.append(sameWrapper);
   const expiry = field(
     'expirationDate',
-    'Срок (Unix seconds)',
+    t('fieldExpiry'),
     'number',
     String(initial.expirationDate ?? Math.floor(Date.now() / 1000) + 86400),
-  );
-  expiry.disabled = initial.session;
-  inputs.session.onchange = () => {
-    expiry.disabled = (inputs.session as HTMLInputElement).checked;
-  };
+  ) as HTMLInputElement;
+  const localWrapper = el('label', 'field');
+  localWrapper.append(el('span', '', t('fieldExpiryLocal')));
+  const local = el('input');
+  local.type = 'datetime-local';
+  local.step = '1';
+  local.id = 'field-expirationLocal';
+  localWrapper.append(local);
+  form.append(localWrapper);
+  const expiryNote = el('p', 'note expiry-note');
+  form.append(expiryNote);
+  function refreshExpiry(source: 'number' | 'local' | 'init') {
+    if (source === 'local') {
+      const seconds = fromLocalInput(local.value);
+      if (seconds !== undefined) expiry.value = String(Math.floor(seconds));
+    } else local.value = toLocalInput(Number(expiry.value));
+    const session = (inputs.session as HTMLInputElement).checked;
+    expiry.disabled = session;
+    local.disabled = session;
+    const seconds = Number(expiry.value);
+    if (session || !Number.isFinite(seconds)) {
+      expiryNote.textContent = '';
+      return;
+    }
+    const capped = clampLifetime({ ...initial, session: false, expirationDate: seconds });
+    expiryNote.textContent = capped.clamped
+      ? t('expiryWillClamp', { date: formatDate(capped.cookie.expirationDate!) })
+      : formatRelative(seconds);
+    expiryNote.dataset.kind = capped.clamped ? 'warning' : '';
+  }
+  expiry.addEventListener('input', () => refreshExpiry('number'));
+  local.addEventListener('input', () => refreshExpiry('local'));
+  inputs.session.addEventListener('change', () => refreshExpiry('init'));
+  refreshExpiry('init');
   field(
     'partitionKey',
-    'Partition key (JSON; пусто = unpartitioned)',
+    t('fieldPartition'),
     'textarea',
     initial.partitionKey ? JSON.stringify(initial.partitionKey) : '',
   );
-  form.append(
-    el(
-      'p',
-      'note',
-      `Store ${context.storeId}. Смена name/domain/path/partition создаёт новую запись и затем удаляет прежнюю; операция не атомарна.`,
-    ),
-  );
+  form.append(el('p', 'note', t('editorNote', { store: context.storeId })));
   form.oninput = () => {
     dirty = true;
   };
@@ -483,11 +679,17 @@ function openEditor(original?: Cookie) {
     dirty = true;
   };
   const controls = el('div', 'form-actions');
-  const cancel = button('Cancel', () => {
+  const cancel = button(t('cancel'), () => {
     if (leave()) renderList();
   });
-  const save = el('button', 'primary', 'Save');
+  const save = el('button', 'primary', t('save'));
   save.type = 'submit';
+  if (original) {
+    const duplicate = button(t('duplicate'), () => {
+      openEditor(undefined, { ...original, name: `${original.name}_copy` });
+    });
+    controls.append(duplicate);
+  }
   controls.append(cancel, save);
   form.append(controls);
   form.onsubmit = (event) => {
@@ -503,13 +705,12 @@ function openEditor(original?: Cookie) {
           partitionKey = parsed.cookies[0].partitionKey;
         }
       } catch {
-        errors.partitionKey.textContent =
-          'Укажите корректный partitionKey JSON с topLevelSite и hasCrossSiteAncestor.';
+        errors.partitionKey.textContent = t('partitionInvalid');
         inputs.partitionKey.focus();
         return;
       }
       const isSession = (inputs.session as HTMLInputElement).checked;
-      const cookie: Cookie = {
+      const draft: Cookie = {
         name: inputs.name.value,
         value: inputs.value.value,
         domain: inputs.domain.value,
@@ -523,6 +724,8 @@ function openEditor(original?: Cookie) {
         ...(!isSession ? { expirationDate: Number(expiry.value) } : {}),
         ...(partitionKey ? { partitionKey } : {}),
       };
+      // Chrome caps lifetimes at 400 days; store the capped value the note announced.
+      const { cookie, clamped } = clampLifetime(draft);
       const validation = validateCookie(cookie, context);
       if (Object.keys(validation).length) {
         for (const [key, message] of Object.entries(validation)) {
@@ -531,20 +734,14 @@ function openEditor(original?: Cookie) {
         inputs[Object.keys(validation)[0]]?.focus();
         return;
       }
-      if (
-        original &&
-        identity(original) !== identity(cookie) &&
-        !confirm(
-          'Identity изменилась. Создать новую cookie и удалить прежнюю? Возможен частичный результат.',
-        )
-      )
+      if (original && identity(original) !== identity(cookie) && !confirm(t('confirmIdentity')))
         return;
       try {
         await api.save(cookie, original, context!);
         dirty = false;
         await reload();
         renderList();
-        notify('Cookie сохранена; список перечитан.', 'success');
+        notify(clamped ? t('savedClamped') : t('saved'), 'success');
       } catch (error) {
         await reload();
         throw error;
@@ -559,58 +756,68 @@ function openRemove() {
   notify('');
   screen = 'remove';
   content.replaceChildren();
-  backHeader('Удаление');
+  backHeader(t('removeTitle'));
   const panel = el('div', 'form');
   panel.append(
     el(
       'p',
       '',
-      `Выбрано ${selected.size}. Всего на ${context.host}: ${cookies.length}. Поиск не расширяет выбор.`,
+      t('removeSummary', { selected: selected.size, host: context.host, total: cookies.length }),
     ),
   );
+  const backupLabel = el('label', 'check-line');
+  const backup = el('input');
+  backup.type = 'checkbox';
+  backup.id = 'remove-backup';
+  backupLabel.append(backup, el('span', '', t('backupBeforeRemove')));
   const removeSelected = button(
-    `Удалить выбранные (${selected.size})`,
-    () => deleteMany(cookies.filter((c) => selected.has(identity(c)))),
+    t('removeSelected', { n: selected.size }),
+    () =>
+      deleteMany(
+        cookies.filter((c) => selected.has(identity(c))),
+        backup.checked,
+      ),
     'danger',
     'remove',
   );
   removeSelected.disabled = !selected.size;
   const all = button(
-    `Удалить все cookies этого сайта (${cookies.length})`,
-    () => deleteMany([...cookies]),
+    t('removeAll', { n: cookies.length }),
+    () => deleteMany([...cookies], backup.checked),
     'danger',
   );
   all.disabled = !cookies.length;
-  panel.append(removeSelected, all);
+  panel.append(backupLabel, removeSelected, all, el('p', 'note', t('undoNote')));
   refreshPanel = openRemove;
   content.append(panel);
 }
-async function deleteMany(items: Cookie[]) {
+async function deleteMany(items: Cookie[], backup: boolean) {
   if (!items.length) {
-    notify('Сначала выберите cookies.');
+    notify(t('selectFirst'));
     return;
   }
-  if (
-    !confirm(
-      `Удалить ${items.length} cookies на ${context!.host}? Только текущий store и partition.`,
-    )
-  )
-    return;
-  let success = 0;
+  if (!confirm(t('confirmRemoveMany', { n: items.length, host: context!.host }))) return;
+  if (backup) download(serialize(items, 'cookiess').text, 'cookiess', '-backup');
+  const removed: Cookie[] = [];
   const errors: string[] = [];
   // Short paths first reduce URL ambiguity without widening selected scope.
   for (const cookie of [...items].sort((a, b) => a.path.length - b.path.length))
     try {
       await api.remove(cookie, context!);
-      success++;
+      removed.push(cookie);
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : 'Не удалось удалить cookie.');
+      errors.push(
+        `${unnamed(cookie)} ${cookie.path}: ${error instanceof Error ? error.message : t('removeFailed')}`,
+      );
     }
   await reload();
   renderList();
-  notify(
-    `Удалено ${success} из ${items.length}.${errors.length ? ` Ошибок: ${errors.length}. ${errors[0]}` : ''}`,
+  const message = t('removedMany', { done: removed.length, total: items.length });
+  offerUndo(
+    errors.length ? `${message} ${t('errorsCount', { n: errors.length })}` : message,
     errors.length ? 'error' : 'success',
+    removed,
+    errors,
   );
 }
 function openImport() {
@@ -618,17 +825,17 @@ function openImport() {
   notify('');
   screen = 'import';
   content.replaceChildren();
-  backHeader('Import · локальный файл');
+  backHeader(t('importTitle'));
   const panel = el('div', 'form');
   const fileLabel = el('label', 'field');
-  fileLabel.append(el('span', '', 'Файл JSON / cookies.txt'));
+  fileLabel.append(el('span', '', t('importFile')));
   const file = el('input');
   file.type = 'file';
   file.accept = '.json,.txt';
   fileLabel.append(file);
   panel.append(fileLabel);
   const textLabel = el('label', 'field');
-  textLabel.append(el('span', '', 'Или вставьте текст'));
+  textLabel.append(el('span', '', t('importPaste')));
   const text = el('textarea', 'import-text');
   text.rows = 7;
   textLabel.append(text);
@@ -637,44 +844,80 @@ function openImport() {
     void run(async () => {
       const selectedFile = file.files?.[0];
       if (!selectedFile) return;
-      if (selectedFile.size > 10_000_000) throw new Error('Файл больше 10 MB.');
+      if (selectedFile.size > 10_000_000) throw new Error(t('fileTooLarge'));
       text.value = await selectedFile.text();
       dirty = true;
       invalidate();
     });
   const policyLabel = el('label', 'field');
-  policyLabel.append(el('span', '', 'Конфликты identity'));
-  const policy = el('select');
-  for (const [value, label] of [
-    ['replace', 'Заменить существующие'],
-    ['skip', 'Пропустить существующие'],
-  ]) {
-    const o = el('option', '', label);
-    o.value = value;
-    policy.append(o);
-  }
+  policyLabel.append(el('span', '', t('conflictPolicy')));
+  const policy = select(
+    t('conflictPolicy'),
+    [
+      ['replace', t('policyReplace')],
+      ['skip', t('policySkip')],
+    ],
+    'replace',
+  );
   policyLabel.append(policy);
   panel.append(policyLabel);
   const preview = el('div', 'preview');
   preview.setAttribute('aria-live', 'polite');
   let items: ImportItem[] = [];
   let parseErrors: string[] = [];
+  const progress = el('p', 'import-progress');
+  progress.hidden = true;
+  const cancelImport = el('button', '', t('cancelImport'));
+  cancelImport.type = 'button';
+  cancelImport.hidden = true;
+  let controller: AbortController | undefined;
+  // Not wrapped in run(): it must work while the import holds the busy lock.
+  cancelImport.onclick = () => {
+    controller?.abort();
+    cancelImport.disabled = true;
+  };
   const apply = button(
-    'Применить импорт',
+    t('applyImport'),
     async () => {
-      const result = await applyImport(items, context!, api, policy.value as 'replace' | 'skip');
+      controller = new AbortController();
+      cancelImport.hidden = false;
+      cancelImport.disabled = false;
+      progress.hidden = false;
+      let result;
+      try {
+        result = await applyImport(items, context!, api, policy.value as 'replace' | 'skip', {
+          signal: controller.signal,
+          onProgress: (done, total) => {
+            progress.textContent = t('importProgress', { done, total });
+          },
+        });
+      } finally {
+        cancelImport.hidden = true;
+        progress.hidden = true;
+        controller = undefined;
+      }
       dirty = false;
       await reload();
       const errors = result.errors.length + parseErrors.length;
+      const head = result.cancelled
+        ? t('importCancelled')
+        : errors
+          ? t('importPartial')
+          : t('importDone');
       notify(
-        `${errors ? 'Частичный импорт' : 'Импорт завершён'}: записано ${result.success}, пропущено ${result.skipped}, ошибок ${errors}.`,
-        errors ? 'error' : 'success',
+        t('importResult', {
+          head,
+          success: result.success,
+          skipped: result.skipped,
+          errors,
+        }),
+        errors || result.cancelled ? 'error' : 'success',
       );
       preview.replaceChildren(
         el(
           'p',
           '',
-          `Результат: ${result.success} успешно · ${result.skipped} пропущено · ${errors} ошибок`,
+          t('importResultLine', { success: result.success, skipped: result.skipped, errors }),
         ),
         ...result.errors.map((e) => el('p', 'field-error', e)),
         ...parseErrors.map((e) => el('p', 'field-error', e)),
@@ -696,7 +939,7 @@ function openImport() {
   };
   policy.onchange = invalidate;
   refreshPanel = invalidate;
-  const inspect = button('Предпросмотр', async () => {
+  const inspect = button(t('preview'), async () => {
     notify('');
     await api.assertContext(context!);
     await reload();
@@ -707,7 +950,12 @@ function openImport() {
       el(
         'p',
         'preview-count',
-        `Добавить ${items.filter((i) => i.action === 'add').length} · заменить ${items.filter((i) => i.action === 'replace').length} · пропустить ${items.filter((i) => i.action === 'skip').length} · ошибок ${parsed.errors.length}`,
+        t('previewCount', {
+          add: items.filter((i) => i.action === 'add').length,
+          replace: items.filter((i) => i.action === 'replace').length,
+          skip: items.filter((i) => i.action === 'skip').length,
+          errors: parsed.errors.length,
+        }),
       ),
     );
     for (const warning of parsed.warnings) preview.append(el('p', 'note', warning));
@@ -717,20 +965,14 @@ function openImport() {
         el(
           'p',
           'preview-item',
-          `${item.action === 'add' ? 'Добавить' : item.action === 'replace' ? 'Заменить' : 'Пропустить'}: ${item.cookie.name || '(без имени)'} · ${item.cookie.domain}${item.cookie.path}${item.reason ? ` — ${item.reason}` : ''}`,
+          `${t(item.action === 'add' ? 'actionAdd' : item.action === 'replace' ? 'actionReplace' : 'actionSkip')}: ${unnamed(item.cookie)} · ${item.cookie.domain}${item.cookie.path}${item.reason ? ` — ${item.reason}` : ''}`,
         ),
       );
-    preview.append(
-      el(
-        'p',
-        'note',
-        'Store источника игнорируется. Только текущий сайт и top-level partition. Существующие cookies не очищаются.',
-      ),
-    );
+    preview.append(el('p', 'note', t('importNote')));
     apply.disabled = !items.some((i) => i.action !== 'skip');
     preview.scrollIntoView({ block: 'nearest' });
   });
-  panel.append(inspect, preview, apply);
+  panel.append(inspect, preview, progress, apply, cancelImport);
   content.append(panel);
 }
 function openExport() {
@@ -738,46 +980,37 @@ function openExport() {
   notify('');
   screen = 'export';
   content.replaceChildren();
-  backHeader('Export · локальная копия');
+  backHeader(t('exportTitle'));
   const panel = el('div', 'form');
   const scopeLabel = el('label', 'field');
-  scopeLabel.append(el('span', '', 'Область экспорта'));
-  const scope = el('select');
-  for (const [value, label] of [
-    ['all', `Все cookies сайта (${cookies.length})`],
-    ['selected', `Выбранные (${selected.size})`],
-  ]) {
-    const o = el('option', '', label);
-    o.value = value;
-    scope.append(o);
-  }
-  scope.value = selected.size ? 'selected' : 'all';
+  scopeLabel.append(el('span', '', t('exportScope')));
+  const scope = select(
+    t('exportScope'),
+    [
+      ['all', t('exportAll', { n: cookies.length })],
+      ['selected', t('exportSelected', { n: selected.size })],
+    ],
+    selected.size ? 'selected' : 'all',
+  );
   scopeLabel.append(scope);
   panel.append(scopeLabel);
   const formatLabel = el('label', 'field');
-  formatLabel.append(el('span', '', 'Формат'));
-  const format = el('select');
-  for (const [value, label] of [
-    ['cookiess', 'Cookiess JSON · все атрибуты'],
-    ['cookie-editor', 'Cookie-Editor JSON'],
-    ['netscape', 'Netscape cookies.txt · с потерями'],
-  ]) {
-    const o = el('option', '', label);
-    o.value = value;
-    format.append(o);
-  }
+  formatLabel.append(el('span', '', t('exportFormat')));
+  const format = select(
+    t('exportFormat'),
+    [
+      ['cookiess', t('formatCookiess')],
+      ['cookie-editor', 'Cookie-Editor JSON'],
+      ['netscape', t('formatNetscape')],
+    ],
+    'cookiess',
+  );
   formatLabel.append(format);
   panel.append(formatLabel);
-  panel.append(
-    el(
-      'p',
-      'note',
-      'Поиск не меняет экспорт. Файлы содержат секретные значения: храните их бережно. Partitioned cookies экспортируются только в JSON.',
-    ),
-  );
+  panel.append(el('p', 'note', t('exportNote')));
   const warning = el('p', 'note');
   const outputLabel = el('label', 'field');
-  outputLabel.append(el('span', '', 'Текст для ручного копирования'));
+  outputLabel.append(el('span', '', t('exportManual')));
   const output = el('textarea', 'export-text');
   output.readOnly = true;
   output.rows = 8;
@@ -792,7 +1025,7 @@ function openExport() {
       warning.textContent = result.warnings.join(' ');
     } catch (error) {
       output.value = '';
-      warning.textContent = error instanceof Error ? error.message : 'Не удалось экспортировать.';
+      warning.textContent = error instanceof Error ? error.message : t('exportFailed');
     }
   }
   scope.onchange = refreshOutput;
@@ -801,38 +1034,28 @@ function openExport() {
   refreshOutput();
   panel.append(
     button(
-      'Скачать файл',
+      t('downloadFile'),
       () => {
         refreshOutput();
         if (!output.value) throw new Error(warning.textContent!);
-        const blob = new Blob([output.value], {
-          type: format.value === 'netscape' ? 'text/plain' : 'application/json',
-        });
-        const url = URL.createObjectURL(blob);
-        const link = el('a');
-        link.href = url;
-        link.download = `cookiess-${context!.host.replace(/[^a-zA-Z0-9.-]/g, '_')}-${new Date().toISOString().slice(0, 10)}.${format.value === 'netscape' ? 'txt' : 'json'}`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        notify('Файл подготовлен для скачивания.', 'success');
+        download(output.value, format.value as Format);
+        notify(t('downloadReady'), 'success');
       },
       'primary',
       'export',
     ),
-    button('Скопировать текст', async () => {
+    button(t('copyText'), async () => {
       refreshOutput();
       if (!output.value) throw new Error(warning.textContent!);
-      try {
-        await navigator.clipboard.writeText(output.value);
-        notify('Текст скопирован.', 'success');
-      } catch {
-        output.focus();
-        output.select();
-        notify('Буфер недоступен. Текст выделен: нажмите Ctrl+C.');
-      }
+      await copyText(output.value, output);
     }),
   );
   content.append(panel);
+}
+function markStale() {
+  ready = false;
+  lock(busy);
+  notify(t('tabChanged'), 'error');
 }
 let timer: ReturnType<typeof setTimeout> | undefined;
 chrome.cookies.onChanged.addListener(() => {
@@ -840,24 +1063,33 @@ chrome.cookies.onChanged.addListener(() => {
   timer = setTimeout(() => {
     if (!busy && ready && allowed)
       void reload().catch(() => {
-        if (ready) notify('Не удалось перечитать cookies. Проверьте доступ.', 'error');
+        if (ready) notify(t('reloadFailed'), 'error');
       });
   }, 150);
 });
 chrome.tabs.onUpdated.addListener((id, change) => {
-  if (
-    id === context?.tabId &&
-    change.url &&
-    new URL(change.url).origin !== new URL(context.url).origin
-  ) {
-    ready = false;
-    lock(busy);
-    notify('Сайт вкладки изменился. Нажмите обновление перед записью.', 'error');
+  if (id !== context?.tabId) return;
+  const known = context;
+  if (change.url) {
+    if (new URL(change.url).origin !== new URL(known.url).origin) markStale();
+    return;
   }
+  // Without host access to the new site Chrome omits change.url. A load start is then the
+  // only signal, so re-read the tab: a different origin or a lost URL marks writes stale.
+  if (change.status === 'loading' && ready)
+    void api.context().then(
+      (next) => {
+        if (context === known && new URL(next.url).origin !== new URL(known.url).origin)
+          markStale();
+      },
+      () => {
+        if (context === known) markStale();
+      },
+    );
 });
 chrome.permissions.onRemoved.addListener(() => {
   ready = false;
   lock(busy);
-  notify('Разрешение изменилось. Обновите контекст сайта.', 'error');
+  notify(t('permissionChanged'), 'error');
 });
 void initialize();

@@ -83,7 +83,21 @@ describe('file contracts', () => {
     expect(result.warnings).toHaveLength(1);
   });
   it('re-imports every name Chrome stores, so an export is never refused by its own import', () => {
-    const names = ['a b', 'a(b)', 'a"b', 'a,b', 'a:b', 'a/b', 'a[b]', 'a{b}', 'a?b', 'a@b', 'a<b>', 'a\\b', 'имя'];
+    const names = [
+      'a b',
+      'a(b)',
+      'a"b',
+      'a,b',
+      'a:b',
+      'a/b',
+      'a[b]',
+      'a{b}',
+      'a?b',
+      'a@b',
+      'a<b>',
+      'a\\b',
+      'имя',
+    ];
     const cookies = names.map((name) => ({ ...cookie, name }));
     for (const format of ['cookiess', 'cookie-editor'] as const) {
       const parsed = parse(serialize(cookies, format).text);
@@ -102,11 +116,24 @@ describe('file contracts', () => {
       expect(parse(JSON.stringify([bad])).errors[0]).toMatch(/лимит Chrome/);
   });
   it('normalizes foreign SameSite spellings only in legacy arrays', () => {
-    const spellings = { Lax: 'lax', STRICT: 'strict', None: 'no_restriction', no_restriction: 'no_restriction' };
+    const spellings = {
+      Lax: 'lax',
+      STRICT: 'strict',
+      None: 'no_restriction',
+      no_restriction: 'no_restriction',
+    };
     for (const [input, expected] of Object.entries(spellings))
-      expect(parse(JSON.stringify([{ ...cookie, sameSite: input }])).cookies[0].sameSite).toBe(expected);
+      expect(parse(JSON.stringify([{ ...cookie, sameSite: input }])).cookies[0].sameSite).toBe(
+        expected,
+      );
     expect(
-      parse(JSON.stringify({ format: 'cookiess', version: 1, cookies: [{ ...cookie, sameSite: 'Lax' }] })).errors,
+      parse(
+        JSON.stringify({
+          format: 'cookiess',
+          version: 1,
+          cookies: [{ ...cookie, sameSite: 'Lax' }],
+        }),
+      ).errors,
     ).toHaveLength(1);
   });
   it('still refuses names Chrome refuses (control chars, =, ;, outer spaces)', () => {

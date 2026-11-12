@@ -1,17 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Cookiess",
-  "version": "1.0.2",
+  "name": "__MSG_extName__",
+  "version": "1.1.0",
   "minimum_chrome_version": "132",
-  "description": "Локальный менеджер cookies: просмотр, редактирование, импорт и экспорт текущего сайта.",
-  "permissions": [
-    "cookies",
-    "activeTab",
-    "storage"
-  ],
-  "optional_host_permissions": [
-    "*://*/*"
-  ],
+  "description": "__MSG_extDescription__",
+  "default_locale": "ru",
+  "permissions": ["cookies", "activeTab", "storage"],
+  "optional_host_permissions": ["*://*/*"],
   "action": {
     "default_popup": "index.html",
     "default_title": "Cookiess",
@@ -31,5 +26,13 @@
   "incognito": "split",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+K"
+      },
+      "description": "__MSG_commandOpen__"
+    }
   }
 }

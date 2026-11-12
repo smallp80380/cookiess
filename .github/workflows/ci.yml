@@ -27,6 +27,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      - name: Stamp build number into version
+        run: node scripts/stamp-version.mjs ${{ github.run_number }}
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -61,6 +63,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      - name: Stamp build number into version
+        run: node scripts/stamp-version.mjs ${{ github.run_number }}
       - uses: actions/download-artifact@v4
         with:
           name: cookiess-install-zip
@@ -99,7 +103,7 @@ jobs:
           retention-days: 14
 
   release:
-    name: Update latest-build release
+    name: Publish release
     needs: [verify, browser]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
@@ -107,6 +111,10 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Stamp build number into version
+        run: node scripts/stamp-version.mjs ${{ github.run_number }}
       - uses: actions/download-artifact@v4
         with:
           name: cookiess-install-zip

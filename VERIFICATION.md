@@ -89,7 +89,7 @@ Typecheck, lint, 20 unit tests, build/package and exact ZIP/manifest resource va
 
 ## Rolling GitHub release automation
 
-Workflow now updates the `latest-build` prerelease on successful main pushes or manual main runs, only after every verify matrix job succeeds. The release job alone receives contents:write and downloads the verified Ubuntu artifact. It validates the archive/version/resources, publishes a stable download filename plus SHA256SUMS and build-info (source commit/version/CI URL), and only moves the reserved latest-build tag. Versioned releases stay separate. PRs do not publish. Main workflows are not cancelled during publication; a superseded main commit is skipped before release mutation. YAML parsing, shell syntax and job dependency/permission gates were checked locally. Creation/update are verified through actual Actions runs and the downloaded release assets.
+Workflow publishes a separate release for every successful main push or manual main run, only after every verify and browser job succeeds. Each job stamps the build number into the version (`X.Y.Z.<run_number>`, scripts/stamp-version.mjs) in package.json and the manifest, so the ZIP, manifest, tag `vX.Y.Z.N` and release title share one unique, increasing Chrome-valid version. The release job alone receives contents:write and downloads the verified Ubuntu artifact. It validates archive/version/resources, uploads the versioned ZIP plus a stable `cookiess-latest.zip` (reachable via releases/latest/download), SHA256SUMS and build-info, lists commits since the previous Latest release, and marks the new release Latest. Re-runs of a published build are no-ops; a superseded main commit is skipped before release mutation. PRs do not publish.
 
 ## Install-ZIP browser gate
 
